@@ -1,10 +1,11 @@
--- Olea Control - Esquema inicial v1.1 para Almacenes, MRP y trazabilidad
+-- Olea Control - Esquema inicial v1.2 para Almacenes, MRP y trazabilidad
 -- Compatible con MySQL Community Server 8.0.46 / InnoDB / utf8mb4.
 --
 -- IMPORTANTE
 -- 1. Seleccione primero la base de datos de Oleolab en phpMyAdmin.
 --    Si la importacion v1 se detuvo en forecast_versions, puede volver a
---    importar este archivo: las tablas ya creadas se omiten con IF NOT EXISTS.
+--    importar este archivo: las tablas ya creadas se omiten con IF NOT EXISTS,
+--    las vistas se actualizan y los objetos programables se recrean.
 -- 2. Este archivo no crea ni elimina la base de datos.
 -- 3. No contiene usuarios, contrasenas ni credenciales de MySQL.
 -- 4. Las existencias se obtienen del libro mayor; no se editan directamente.
@@ -1472,7 +1473,7 @@ CREATE TABLE IF NOT EXISTS integration_outbox (
 -- VISTAS OPERATIVAS
 -- -----------------------------------------------------------------------------
 
-CREATE VIEW vw_inventory_on_hand AS
+CREATE OR REPLACE VIEW vw_inventory_on_hand AS
 SELECT
     l.item_id,
     l.inventory_lot_id,
@@ -1487,7 +1488,7 @@ WHERE m.status = 'POSTED'
 GROUP BY l.item_id, l.inventory_lot_id, l.warehouse_id, l.location_id, l.uom_id
 HAVING SUM(l.quantity_delta) <> 0;
 
-CREATE VIEW vw_inventory_active_reservations AS
+CREATE OR REPLACE VIEW vw_inventory_active_reservations AS
 SELECT
     item_id,
     inventory_lot_id,
@@ -1499,7 +1500,7 @@ WHERE status IN ('ACTIVE','PARTIALLY_CONSUMED')
 GROUP BY item_id, inventory_lot_id, warehouse_id, location_id
 HAVING SUM(reserved_qty - consumed_qty) > 0;
 
-CREATE VIEW vw_inventory_availability AS
+CREATE OR REPLACE VIEW vw_inventory_availability AS
 SELECT
     s.item_id,
     s.inventory_lot_id,
@@ -1523,7 +1524,7 @@ LEFT JOIN vw_inventory_active_reservations r
 INNER JOIN warehouse_locations loc ON loc.id = s.location_id
 LEFT JOIN inventory_lots lot ON lot.id = s.inventory_lot_id;
 
-CREATE VIEW vw_current_forecast AS
+CREATE OR REPLACE VIEW vw_current_forecast AS
 SELECT
     p.id AS forecast_plan_id,
     p.plan_code,
@@ -1540,7 +1541,7 @@ FROM forecast_plans p
 INNER JOIN forecast_versions v ON v.forecast_plan_id = p.id AND v.is_current = 1
 INNER JOIN forecast_lines l ON l.forecast_version_id = v.id;
 
-CREATE VIEW vw_pending_sales_orders AS
+CREATE OR REPLACE VIEW vw_pending_sales_orders AS
 SELECT
     o.id AS sales_order_id,
     o.order_number,
@@ -1562,7 +1563,7 @@ INNER JOIN sales_order_lines l ON l.sales_order_id = o.id
 WHERE o.status NOT IN ('CLOSED','CANCELLED')
   AND l.status <> 'CANCELLED';
 
-CREATE VIEW vw_lot_traceability_edges AS
+CREATE OR REPLACE VIEW vw_lot_traceability_edges AS
 SELECT
     g.process_batch_id,
     b.batch_code,
@@ -1584,6 +1585,7 @@ INNER JOIN inventory_lots child_lot ON child_lot.id = g.child_lot_id;
 
 DELIMITER $$
 
+DROP TRIGGER IF EXISTS trg_audit_log_no_update$$
 CREATE TRIGGER trg_audit_log_no_update
 BEFORE UPDATE ON audit_log
 FOR EACH ROW
@@ -1591,6 +1593,7 @@ BEGIN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'El historial de auditoria es inmutable';
 END$$
 
+DROP TRIGGER IF EXISTS trg_audit_log_no_delete$$
 CREATE TRIGGER trg_audit_log_no_delete
 BEFORE DELETE ON audit_log
 FOR EACH ROW
@@ -1598,6 +1601,7 @@ BEGIN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'El historial de auditoria no se puede eliminar';
 END$$
 
+DROP TRIGGER IF EXISTS trg_inventory_lines_no_update_posted$$
 CREATE TRIGGER trg_inventory_lines_no_update_posted
 BEFORE UPDATE ON inventory_movement_lines
 FOR EACH ROW
@@ -1610,6 +1614,7 @@ BEGIN
     END IF;
 END$$
 
+DROP TRIGGER IF EXISTS trg_inventory_lines_no_insert_posted$$
 CREATE TRIGGER trg_inventory_lines_no_insert_posted
 BEFORE INSERT ON inventory_movement_lines
 FOR EACH ROW
@@ -1622,6 +1627,7 @@ BEGIN
     END IF;
 END$$
 
+DROP TRIGGER IF EXISTS trg_inventory_lines_no_delete_posted$$
 CREATE TRIGGER trg_inventory_lines_no_delete_posted
 BEFORE DELETE ON inventory_movement_lines
 FOR EACH ROW
@@ -1634,6 +1640,7 @@ BEGIN
     END IF;
 END$$
 
+DROP TRIGGER IF EXISTS trg_inventory_movement_no_update_posted$$
 CREATE TRIGGER trg_inventory_movement_no_update_posted
 BEFORE UPDATE ON inventory_movements
 FOR EACH ROW
@@ -1647,6 +1654,7 @@ BEGIN
     END IF;
 END$$
 
+DROP TRIGGER IF EXISTS trg_inventory_movement_no_delete_posted$$
 CREATE TRIGGER trg_inventory_movement_no_delete_posted
 BEFORE DELETE ON inventory_movements
 FOR EACH ROW
@@ -1656,6 +1664,7 @@ BEGIN
     END IF;
 END$$
 
+DROP PROCEDURE IF EXISTS sp_create_pre_lot$$
 CREATE PROCEDURE sp_create_pre_lot (
     IN  p_supplier_id        BIGINT UNSIGNED,
     IN  p_origin_id          BIGINT UNSIGNED,
@@ -1718,6 +1727,7 @@ BEGIN
     COMMIT;
 END$$
 
+DROP PROCEDURE IF EXISTS sp_post_inventory_movement$$
 CREATE PROCEDURE sp_post_inventory_movement (
     IN p_movement_id BIGINT UNSIGNED,
     IN p_user_id     BIGINT UNSIGNED
@@ -1814,7 +1824,7 @@ DELIMITER ;
 -- DATOS INICIALES
 -- -----------------------------------------------------------------------------
 
-INSERT INTO areas (code, name) VALUES
+INSERT IGNORE INTO areas (code, name) VALUES
 ('ADMIN', 'Administracion del sistema'),
 ('COMPRAS', 'Compras'),
 ('LOGISTICA', 'Logistica'),
@@ -1827,14 +1837,14 @@ INSERT INTO areas (code, name) VALUES
 ('MANTENIMIENTO', 'Mantenimiento');
 
 -- El id=1 se reserva intencionalmente para aplicar la regla de un solo administrador.
-INSERT INTO roles (id, code, name, description, is_system) VALUES
+INSERT IGNORE INTO roles (id, code, name, description, is_system) VALUES
 (1, 'SUPER_ADMIN', 'Administrador del sistema', 'Acceso total. Solo puede existir uno activo.', 1),
 (2, 'AREA_MANAGER', 'Responsable de area', 'Gestiona catalogos y operaciones autorizadas de su area.', 1),
 (3, 'OPERATOR', 'Operador', 'Captura operaciones dentro de los modulos asignados.', 1),
 (4, 'APPROVER', 'Aprobador', 'Aprueba o rechaza operaciones autorizadas.', 1),
 (5, 'VIEWER', 'Consulta', 'Acceso de solo lectura a informacion autorizada.', 1);
 
-INSERT INTO app_modules (code, name, route_path, sort_order) VALUES
+INSERT IGNORE INTO app_modules (code, name, route_path, sort_order) VALUES
 ('DASHBOARD', 'Tablero', '/dashboard', 10),
 ('ADMIN', 'Administracion', '/admin', 20),
 ('CATALOGS', 'Catalogos', '/catalogos', 30),
@@ -1855,7 +1865,7 @@ INSERT INTO app_modules (code, name, route_path, sort_order) VALUES
 ('REPORTS', 'Reportes', '/reportes', 180),
 ('AUDIT_LOG', 'Bitacora del sistema', '/admin/auditoria', 190);
 
-INSERT INTO permissions (module_id, action_code, description)
+INSERT IGNORE INTO permissions (module_id, action_code, description)
 SELECT m.id, a.action_code, CONCAT(a.action_code, ' en ', m.name)
 FROM app_modules m
 CROSS JOIN (
@@ -1869,10 +1879,10 @@ CROSS JOIN (
     SELECT 'ADMIN'
 ) a;
 
-INSERT INTO role_permissions (role_id, permission_id)
+INSERT IGNORE INTO role_permissions (role_id, permission_id)
 SELECT 1, id FROM permissions;
 
-INSERT INTO units_of_measure (code, name, decimal_places) VALUES
+INSERT IGNORE INTO units_of_measure (code, name, decimal_places) VALUES
 ('KG', 'Kilogramo', 3),
 ('G', 'Gramo', 3),
 ('L', 'Litro', 3),
@@ -1882,7 +1892,7 @@ INSERT INTO units_of_measure (code, name, decimal_places) VALUES
 ('BEAN', 'Bean o contenedor de fruta', 0),
 ('PALLET', 'Tarima', 0);
 
-INSERT INTO item_categories (code, name) VALUES
+INSERT IGNORE INTO item_categories (code, name) VALUES
 ('FRUIT', 'Fruta y materia prima agricola'),
 ('RAW', 'Otras materias primas'),
 ('PACK', 'Materiales de empaque'),
@@ -1891,8 +1901,9 @@ INSERT INTO item_categories (code, name) VALUES
 ('BULK', 'Aceites a granel y producto en proceso'),
 ('FG', 'Producto terminado');
 
-INSERT INTO schema_migrations (version_no, description)
-VALUES ('001', 'Esquema inicial de almacenes, MRP, calidad y trazabilidad');
+INSERT IGNORE INTO schema_migrations (version_no, description)
+VALUES ('001', 'Esquema inicial de almacenes, MRP, calidad y trazabilidad'),
+       ('002', 'Importacion idempotente de vistas, rutinas, disparadores y catalogos base');
 
 -- CREACION DEL PRIMER ADMINISTRADOR
 -- La aplicacion debe crear el usuario con un hash Argon2id o bcrypt, nunca con texto plano,
