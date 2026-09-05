@@ -1,0 +1,66 @@
+# Instalación en CI4KASH / cPanel
+
+## 1. Preparar el sitio
+
+En cPanel cree un subdominio con SSL, por ejemplo `almacen.ci4kash.com`, y apúntelo a una carpeta propia. No use la carpeta de la aplicación de Mantenimiento.
+
+PHP requerido: 8.2 o superior con `pdo_mysql`, `mbstring` y `json`. El servidor mostrado (PHP 8.3.31 y MySQL 8.0.46) es compatible.
+
+## 2. Importar la base
+
+Seleccione la base correcta en phpMyAdmin e importe `database/schema.sql`. El archivo usa `CREATE TABLE IF NOT EXISTS`, por lo que puede volver a ejecutarse después de la importación que falló.
+
+En cPanel confirme que el usuario MySQL de la aplicación tenga privilegios sobre esa base. No use la cuenta de cPanel como contraseña de la aplicación.
+
+## 3. Subir la aplicación
+
+Suba y extraiga todo el paquete dentro de la raíz del subdominio. Deben quedar juntos `index.html`, `app.js`, `styles.css`, `config.js`, `.htaccess`, `api/`, `assets/`, `database/` y `private-tools/`.
+
+En el Administrador de archivos active **Mostrar archivos ocultos** para comprobar que los `.htaccess` también se cargaron. Use permisos `755` para carpetas, `644` para archivos y, si el hosting lo permite, `600` para `api/config.local.php`.
+
+## 4. Configurar la conexión privada
+
+Copie `api/config.example.php` como `api/config.local.php` y edite solamente la copia:
+
+```php
+'host' => 'localhost',
+'name' => 'NOMBRE_REAL_DE_LA_BD',
+'user' => 'USUARIO_REAL_DE_LA_BD',
+'password' => 'CONTRASEÑA_REAL_DE_LA_BD',
+'trusted_origin' => 'https://almacen.ci4kash.com',
+```
+
+Si publica en `https://ci4kash.com/almacen`, use `https://ci4kash.com` como `trusted_origin`. Nunca coloque la contraseña en `config.js`, GitHub o el chat.
+
+## 5. Probar la API
+
+Abra en el navegador:
+
+```text
+https://SU-DOMINIO/api/index.php?action=health
+```
+
+La respuesta correcta contiene `"status":"ok"` y `"database":"connected"`.
+
+## 6. Crear el administrador único
+
+Desde Terminal de cPanel, ubicado en la carpeta de la aplicación, ejecute:
+
+```bash
+php private-tools/create_admin.php admin@oleolab.mx "Administrador Oleolab"
+```
+
+Escriba una contraseña final y segura de al menos 12 caracteres cuando se solicite. El script se niega a crear un segundo superadministrador.
+
+## 7. Validar antes del uso diario
+
+1. Entre con el administrador y confirme que aparecen todos los módulos.
+2. Cargue unidades, almacenes, ubicaciones, proveedores/orígenes, clientes, SKU, listas de materiales y especificaciones.
+3. Registre un flujo de prueba completo: cita, recepción, pre-lote, solicitud de Calidad y movimiento.
+4. Verifique inventario, trazabilidad y bitácora contra los documentos originales.
+5. Cree usuarios por área y entregue solo los módulos necesarios.
+6. Active respaldos diarios de archivos y MySQL en cPanel.
+
+Al crear usuarios, los códigos de módulo disponibles son: `APPOINTMENTS`, `RECEIVING`, `QUALITY`, `INVENTORY`, `COUNTS`, `FORECAST`, `MRP`, `PRODUCTION`, `EXTRACTION`, `SHIPPING`, `RETURNS`, `MAINTENANCE`, `CATALOGS` y `AUDIT_LOG`. Sepárelos con comas; `ADMIN` queda reservado al superadministrador.
+
+No se debe operar con datos reales hasta completar esta validación y sustituir los ejemplos por los catálogos autorizados.

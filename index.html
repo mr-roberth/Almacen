@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0d4a35">
+  <meta name="description" content="Control integral de almacenes, trazabilidad y planeación de Oleolab">
+  <meta name="robots" content="noindex,nofollow">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://ci4kash.com https://*.ci4kash.com; img-src 'self' data:; style-src 'self'; script-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'">
+  <title>Oleolab · Control de Almacenes</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect rx=%2220%22 width=%22100%22 height=%22100%22 fill=%22%230d4a35%22/><path d=%22M27 18v24l23 19V38zM52 62v20l22-18V43z%22 fill=%22white%22/></svg>">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <div id="loading" class="loading hidden" aria-live="polite"><span class="spinner"></span><span id="loading-label">Procesando…</span></div>
+
+  <main id="auth" class="auth-shell">
+    <section class="auth-hero">
+      <img src="assets/oleolab-logo.png" alt="Oleolab" class="auth-logo">
+      <div>
+        <p class="eyebrow light">CONTROL DE ALMACENES</p>
+        <h1>Inventario claro. Operación trazable.</h1>
+        <p class="hero-copy">Recepciones, Calidad, existencias, Forecast y embarques conectados desde el origen hasta el cliente.</p>
+      </div>
+      <div class="hero-points" aria-label="Funciones principales">
+        <span>✓ Inventario vivo</span>
+        <span>✓ Trazabilidad por lote</span>
+        <span>✓ Alertas de cumplimiento</span>
+      </div>
+    </section>
+
+    <section class="auth-card-wrap">
+      <div class="auth-card">
+        <p class="eyebrow">OLEOLAB ALMACENES</p>
+        <h2>Bienvenido</h2>
+        <p class="muted">Ingresa con la cuenta creada por el administrador.</p>
+        <form id="login-form" class="stack">
+          <label>Correo electrónico<input name="email" type="email" autocomplete="username" required placeholder="nombre@oleolab.mx"></label>
+          <label>Contraseña<input name="password" type="password" autocomplete="current-password" required placeholder="••••••••••"></label>
+          <button class="btn primary wide" type="submit">Entrar</button>
+        </form>
+        <button id="demo-login" class="btn secondary wide hidden" type="button">Explorar interfaz con datos de muestra</button>
+        <p class="setup-note" id="api-warning"></p>
+        <p class="security-note">El sistema no permite autorregistro. Usuarios, roles y módulos se asignan desde Administración.</p>
+      </div>
+    </section>
+  </main>
+
+  <div id="application" class="app-shell hidden">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <img src="assets/oleolab-logo.png" alt="Oleolab">
+        <span>Control de almacenes</span>
+      </div>
+      <nav id="nav" aria-label="Navegación principal"></nav>
+      <div class="sidebar-user">
+        <div class="avatar" id="avatar">OA</div>
+        <div class="sidebar-user-copy"><strong id="sidebar-name"></strong><small id="sidebar-role"></small></div>
+        <button id="logout" class="icon-btn" title="Cerrar sesión" aria-label="Cerrar sesión">↪</button>
+      </div>
+    </aside>
+
+    <section class="workspace">
+      <header class="topbar">
+        <button id="menu" class="icon-btn mobile-only" aria-label="Abrir menú">☰</button>
+        <div class="title-stack"><p class="eyebrow" id="page-kicker">OPERACIÓN</p><h1 id="page-title">Panel</h1></div>
+        <label class="global-search" aria-label="Buscar en la vista actual"><span>⌕</span><input id="global-search" type="search" placeholder="Buscar lote, SKU, folio…"></label>
+        <button id="alerts-button" class="icon-btn alert-button" aria-label="Abrir alertas"><span>◉</span><b id="alert-count">0</b></button>
+        <button id="quick-action" class="btn primary">＋ Registrar</button>
+      </header>
+      <div id="environment-banner" class="environment-banner hidden"></div>
+      <main id="view" class="view" tabindex="-1"></main>
+    </section>
+  </div>
+
+  <dialog id="operation-dialog" class="dialog">
+    <form id="operation-form" method="dialog" class="dialog-card">
+      <div class="dialog-head">
+        <div><p class="eyebrow">NUEVA OPERACIÓN</p><h2>Registrar movimiento</h2></div>
+        <button type="button" class="icon-btn" data-close-dialog aria-label="Cerrar">×</button>
+      </div>
+      <label class="field">Tipo de operación
+        <select id="operation-type" name="operation_type" required>
+          <option value="appointment">Cita de proveedor</option>
+          <option value="receipt">Recepción y pre-lote</option>
+          <option value="movement">Movimiento de inventario</option>
+          <option value="quality">Solicitud de Calidad</option>
+          <option value="qualityDecision">Dictamen de Calidad</option>
+          <option value="count">Conteo de inventario</option>
+          <option value="return">Devolución o rechazo</option>
+          <option value="user">Usuario y accesos</option>
+          <option value="supplier">Proveedor</option>
+          <option value="origin">Origen de proveedor</option>
+          <option value="warehouse">Almacén</option>
+          <option value="location">Ubicación</option>
+          <option value="item">Producto o material</option>
+          <option value="customer">Cliente</option>
+        </select>
+      </label>
+      <div id="operation-fields" class="form-grid"></div>
+      <div class="dialog-actions">
+        <button type="button" class="btn ghost" data-close-dialog>Cancelar</button>
+        <button type="submit" class="btn primary" data-idle-label="Guardar operación">Guardar operación</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="detail-dialog" class="dialog">
+    <article id="detail-content" class="dialog-card"></article>
+  </dialog>
+
+  <aside id="alerts-panel" class="alerts-panel" aria-hidden="true">
+    <div class="alerts-head"><div><p class="eyebrow">CENTRO DE ALERTAS</p><h2>Atención requerida</h2></div><button id="close-alerts" class="icon-btn" aria-label="Cerrar alertas">×</button></div>
+    <div id="alerts-list" class="alerts-list"></div>
+  </aside>
+  <div id="scrim" class="scrim hidden"></div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
