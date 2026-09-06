@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require __DIR__ . '/bootstrap.php';
+require __DIR__ . '/v13.php';
 
 try {
     $config = loadAppConfig();
@@ -17,10 +18,19 @@ try {
             $pdo->query('SELECT 1')->fetchColumn();
             sendData(['status' => 'ok', 'database' => 'connected', 'utc' => gmdate(DATE_ATOM)]);
         }
+        if (($_GET['action'] ?? '') === 'maintenanceEvidence') {
+            $user = currentUser($pdo);
+            streamMaintenanceEvidence($pdo, $user, (int)($_GET['id'] ?? 0));
+        }
         failRequest('Ruta no encontrada.', 404);
     }
     if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
         failRequest('Método no permitido.', 405);
+    }
+
+    if (($_GET['action'] ?? '') === 'uploadMaintenanceEvidence') {
+        $user = currentUser($pdo);
+        uploadMaintenanceEvidence($pdo, $user);
     }
 
     $request = readJsonBody();
@@ -42,7 +52,7 @@ try {
             sendData(traceLot($pdo, $user, $payload));
         case 'createOperation':
             $user = currentUser($pdo);
-            sendData(createOperation($pdo, $user, $payload), 201);
+            sendData(createOperation($pdo, $user, $payload, $config), 201);
         default:
             failRequest('Acción no reconocida.', 404);
     }
@@ -124,15 +134,21 @@ function handleLogout(PDO $pdo): never
 function buildBootstrap(PDO $pdo, array $user): array
 {
     $isAdmin = isSuperAdmin($pdo, (int)$user['id']);
-    $roleRows = safeRows($pdo, "SELECT r.name FROM user_roles ur INNER JOIN roles r ON r.id = ur.role_id WHERE ur.user_id = :id AND ur.is_active = 1 ORDER BY r.id LIMIT 1", ['id' => $user['id']]);
+    $roleRows = safeRows($pdo, "SELECT r.code,r.name FROM user_roles ur INNER JOIN roles r ON r.id = ur.role_id WHERE ur.user_id = :id AND ur.is_active = 1 ORDER BY r.id LIMIT 1", ['id' => $user['id']]);
+    $areaRows = safeRows($pdo, "SELECT a.id,a.code,a.name FROM app_users u LEFT JOIN areas a ON a.id=u.primary_area_id WHERE u.id=:id LIMIT 1", ['id'=>$user['id']]);
+    $area = $areaRows[0] ?? ['id'=>null,'code'=>'SIN_AREA','name'=>'Sin área asignada'];
     $modules = $isAdmin ? ['*'] : frontendModules($pdo, (int)$user['id']);
 
-    return [
+    $result = [
         'user' => [
             'id' => (int)$user['id'], 'name' => $user['display_name'], 'email' => $user['email'],
-            'role' => $roleRows[0]['name'] ?? 'Usuario', 'modules' => $modules,
+            'role' => $roleRows[0]['name'] ?? 'Usuario', 'roleCode'=>$roleRows[0]['code'] ?? '', 'modules' => $modules,
+            'areaId'=>$area['id'] === null ? null : (int)$area['id'], 'areaCode'=>$area['code'], 'areaName'=>$area['name'],
+            'isSuperAdmin'=>$isAdmin, 'canManageArea'=>$isAdmin || isAreaLeader($pdo,(int)$user['id']),
             'mustChangePassword' => (bool)$user['must_change_password'],
         ],
+        'areaDashboard' => buildAreaDashboard($pdo, $area),
+        'lookups' => buildLookups($pdo, $user, $isAdmin),
         'metrics' => [
             'inventorySkus' => safeScalar($pdo, "SELECT COUNT(DISTINCT item_id) FROM vw_inventory_on_hand"),
             'criticalShortages' => safeScalar($pdo, "SELECT COUNT(*) FROM mrp_requirements WHERE status = 'SHORTAGE'"),
@@ -140,32 +156,48 @@ function buildBootstrap(PDO $pdo, array $user): array
             'ordersAtRisk' => safeScalar($pdo, "SELECT COUNT(*) FROM production_orders WHERE status IN ('MATERIAL_CHECK','ON_HOLD')"),
         ],
         'coverage' => buildCoverage($pdo),
-        'alerts' => safeRows($pdo, "SELECT id, LOWER(severity) AS severity, title, message, DATE_FORMAT(detected_at, '%d %b · %H:%i') AS time FROM alerts WHERE status IN ('OPEN','ACKNOWLEDGED') ORDER BY FIELD(severity,'CRITICAL','WARNING','INFO'), detected_at DESC LIMIT 30"),
-        'appointments' => safeRows($pdo, "SELECT a.appointment_number AS id, DATE_FORMAT(a.scheduled_start, '%H:%i') AS time, CASE WHEN a.delivery_type = 'RETURN' THEN 'Devolución' ELSE 'Entrada' END AS type, COALESCE(s.trade_name,s.legal_name) AS supplier, CONCAT(a.expected_item_type, COALESCE(CONCAT(' · ', a.expected_weight_kg, ' kg'),'')) AS material, 'Por asignar' AS dock, a.status FROM inbound_appointments a INNER JOIN suppliers s ON s.id = a.supplier_id WHERE DATE(a.scheduled_start) BETWEEN UTC_DATE() AND DATE_ADD(UTC_DATE(), INTERVAL 7 DAY) ORDER BY a.scheduled_start LIMIT 100"),
+        'alerts' => $isAdmin?safeRows($pdo, "SELECT id, LOWER(severity) AS severity, title, message, DATE_FORMAT(detected_at, '%d %b · %H:%i') AS time FROM alerts WHERE status IN ('OPEN','ACKNOWLEDGED') ORDER BY FIELD(severity,'CRITICAL','WARNING','INFO'), detected_at DESC LIMIT 30"):safeRows($pdo, "SELECT id, LOWER(severity) AS severity, title, message, DATE_FORMAT(detected_at, '%d %b · %H:%i') AS time FROM alerts WHERE status IN ('OPEN','ACKNOWLEDGED') AND (area_id IS NULL OR area_id=:area) ORDER BY FIELD(severity,'CRITICAL','WARNING','INFO'), detected_at DESC LIMIT 30",['area'=>$area['id']]),
+        'appointments' => safeRows($pdo, "SELECT a.appointment_number AS id, DATE_FORMAT(a.scheduled_start, '%H:%i') AS time, CASE WHEN a.delivery_type = 'RETURN' THEN 'Devolución' ELSE 'Entrada' END AS type, COALESCE(s.trade_name,s.legal_name) AS supplier, CONCAT(CASE a.expected_item_type WHEN 'RAW_FRUIT' THEN 'Aguacate en fruta' WHEN 'RAW_OTHER' THEN 'Materia prima o aceite' WHEN 'PACKAGING' THEN 'Material de empaque' WHEN 'SPARE_PART' THEN 'Refacciones' WHEN 'CONSUMABLE' THEN 'Consumibles' ELSE 'Carga mixta' END,COALESCE(CONCAT(' · ',a.notes),'')) AS material, 'Por asignar' AS dock, a.status FROM inbound_appointments a INNER JOIN suppliers s ON s.id = a.supplier_id WHERE DATE(a.scheduled_start) BETWEEN UTC_DATE() AND DATE_ADD(UTC_DATE(), INTERVAL 7 DAY) ORDER BY a.scheduled_start LIMIT 100"),
         'inventory' => safeRows($pdo, "SELECT i.sku, i.name AS item, i.item_type AS type, w.name AS warehouse, COALESCE(l.lot_code,'Sin lote') AS lot, a.on_hand_qty AS onHand, a.reserved_qty AS reserved, a.available_qty AS available, u.code AS uom, CASE WHEN a.available_qty <= 0 THEN 'Sin disponible' WHEN a.available_qty <= i.reorder_point THEN 'Crítico' ELSE 'Disponible' END AS status FROM vw_inventory_availability a INNER JOIN items i ON i.id=a.item_id INNER JOIN warehouses w ON w.id=a.warehouse_id INNER JOIN units_of_measure u ON u.id=a.uom_id LEFT JOIN inventory_lots l ON l.id=a.inventory_lot_id ORDER BY i.name, w.name, l.lot_code LIMIT 2000"),
-        'movements' => safeRows($pdo, "SELECT m.movement_number AS id, DATE_FORMAT(m.movement_at,'%Y-%m-%d %H:%i') AS date, m.movement_type AS type, i.sku, COALESCE(l.lot_code,'Sin lote') AS lot, ml.quantity_delta AS qty, u.code AS uom, CONCAT(w.code,' / ',wl.code) AS location, COALESCE(usr.display_name,'Sistema') AS user, m.status FROM inventory_movement_lines ml INNER JOIN inventory_movements m ON m.id=ml.movement_id INNER JOIN items i ON i.id=ml.item_id INNER JOIN warehouses w ON w.id=ml.warehouse_id INNER JOIN warehouse_locations wl ON wl.id=ml.location_id INNER JOIN units_of_measure u ON u.id=ml.uom_id LEFT JOIN inventory_lots l ON l.id=ml.inventory_lot_id LEFT JOIN app_users usr ON usr.id=m.posted_by ORDER BY m.movement_at DESC, ml.line_no LIMIT 500"),
+        'movements' => safeRows($pdo, "SELECT m.movement_number AS id, DATE_FORMAT(m.movement_at,'%Y-%m-%d %H:%i') AS date, m.movement_type AS type, i.sku,i.name AS item, COALESCE(l.lot_code,'Sin lote') AS lot, ml.quantity_delta AS qty, u.code AS uom, CONCAT(w.name,' / ',wl.name) AS location, COALESCE(usr.display_name,'Sistema') AS user, m.status FROM inventory_movement_lines ml INNER JOIN inventory_movements m ON m.id=ml.movement_id INNER JOIN items i ON i.id=ml.item_id INNER JOIN warehouses w ON w.id=ml.warehouse_id INNER JOIN warehouse_locations wl ON wl.id=ml.location_id INNER JOIN units_of_measure u ON u.id=ml.uom_id LEFT JOIN inventory_lots l ON l.id=ml.inventory_lot_id LEFT JOIN app_users usr ON usr.id=m.posted_by ORDER BY m.movement_at DESC, ml.line_no LIMIT 500"),
         'receipts' => safeRows($pdo, "SELECT r.receipt_number AS id, COALESCE(p.prelot_code,'Sin pre-lote') AS prelot, COALESCE(s.trade_name,s.legal_name) AS supplier, i.name AS item, CONCAT(COALESCE(rl.ordered_qty,0),' ',u.code) AS expected, CONCAT(rl.received_qty,' ',u.code) AS received, COALESCE(l.quality_status,'PENDING') AS quality, r.status FROM goods_receipts r INNER JOIN suppliers s ON s.id=r.supplier_id INNER JOIN goods_receipt_lines rl ON rl.receipt_id=r.id INNER JOIN items i ON i.id=rl.item_id INNER JOIN units_of_measure u ON u.id=rl.uom_id LEFT JOIN pre_lots p ON p.id=r.prelot_id LEFT JOIN inventory_lots l ON l.id=rl.inventory_lot_id ORDER BY r.arrived_at DESC LIMIT 500"),
         'quality' => safeRows($pdo, "SELECT q.request_number AS id, DATE_FORMAT(q.requested_at,'%d %b · %H:%i') AS requested, q.request_type AS type, COALESCE(r.receipt_number,q.target_type,'Sin referencia') AS reference, COALESCE(i.name,'Pendiente de identificar') AS item, COALESCE(l.lot_code,'Sin lote') AS lot, COALESCE(u.display_name,'Sin asignar') AS owner, q.status FROM quality_requests q LEFT JOIN goods_receipt_lines rl ON rl.id=q.receipt_line_id LEFT JOIN goods_receipts r ON r.id=rl.receipt_id LEFT JOIN inventory_lots l ON l.id=q.inventory_lot_id LEFT JOIN items i ON i.id=l.item_id LEFT JOIN app_users u ON u.id=q.assigned_to ORDER BY q.requested_at DESC LIMIT 500"),
         'forecast' => buildForecast($pdo),
-        'mrp' => safeRows($pdo, "SELECT i.name AS item, i.sku, r.gross_requirement AS required, r.on_hand_qty AS available, r.scheduled_receipts AS incoming, GREATEST(r.net_requirement,0) AS shortage, r.requirement_date AS needDate, CASE WHEN r.net_requirement > 0 THEN 'Comprar o programar' ELSE 'Sin acción' END AS action, r.status FROM mrp_requirements r INNER JOIN items i ON i.id=r.item_id INNER JOIN mrp_runs run ON run.id=r.mrp_run_id WHERE run.id=(SELECT MAX(id) FROM mrp_runs WHERE status='COMPLETED') ORDER BY r.requirement_date,i.name LIMIT 2000"),
+        'mrp' => safeRows($pdo, "SELECT i.name AS item, i.sku, r.gross_requirement AS required, GREATEST(r.on_hand_qty-r.reserved_qty,0) AS available, r.scheduled_receipts AS incoming, GREATEST(r.net_requirement,0) AS shortage, r.requirement_date AS needDate, CASE WHEN r.net_requirement > 0 THEN 'Comprar o programar' ELSE 'Sin acción' END AS action, r.status FROM mrp_requirements r INNER JOIN items i ON i.id=r.item_id INNER JOIN mrp_runs run ON run.id=r.mrp_run_id WHERE run.id=(SELECT MAX(id) FROM mrp_runs WHERE status='COMPLETED') ORDER BY r.requirement_date,i.name LIMIT 2000"),
         'production' => safeRows($pdo, "SELECT o.order_number AS id, i.name AS item, COALESCE(c.trade_name,c.legal_name,'Sin cliente') AS customer, CONCAT(o.planned_qty,' ',u.code) AS planned, CONCAT(o.completed_qty,' ',u.code) AS completed, CONCAT(DATE_FORMAT(o.planned_start,'%d %b'),'–',DATE_FORMAT(o.planned_end,'%d %b')) AS date, CASE WHEN o.status IN ('MATERIAL_CHECK','ON_HOLD') THEN 'No completo' ELSE 'Completo' END AS material, o.status FROM production_orders o INNER JOIN items i ON i.id=o.finished_item_id INNER JOIN units_of_measure u ON u.id=o.uom_id LEFT JOIN customers c ON c.id=o.customer_id ORDER BY o.planned_start DESC LIMIT 500"),
         'shipments' => safeRows($pdo, "SELECT s.shipment_number AS id, COALESCE(o.order_number,'Sin pedido') AS `order`, COALESCE(c.trade_name,c.legal_name) AS customer, COALESCE(DATE_FORMAT(a.scheduled_start,'%d %b · %H:%i'),'Sin cita') AS scheduled, COUNT(sl.id) AS packages, s.status AS progress, 'Por asignar' AS dock, s.status FROM shipments s INNER JOIN customers c ON c.id=s.customer_id LEFT JOIN outbound_appointments a ON a.id=s.outbound_appointment_id LEFT JOIN shipment_lines sl ON sl.shipment_id=s.id LEFT JOIN sales_order_lines sol ON sol.id=sl.sales_order_line_id LEFT JOIN sales_orders o ON o.id=sol.sales_order_id GROUP BY s.id,o.order_number,c.trade_name,c.legal_name,a.scheduled_start,s.status ORDER BY a.scheduled_start DESC LIMIT 500"),
         'returns' => safeRows($pdo, "SELECT r.return_number AS id, 'Cliente' AS type, COALESCE(c.trade_name,c.legal_name) AS partner, COALESCE(r.customer_claim_ref,'Sin referencia') AS reference, i.name AS item, COALESCE(l.lot_code,'Sin lote') AS lot, CONCAT(rl.return_qty,' ',u.code) AS qty, r.return_reason AS reason, r.status FROM customer_returns r INNER JOIN customers c ON c.id=r.customer_id INNER JOIN customer_return_lines rl ON rl.customer_return_id=r.id INNER JOIN items i ON i.id=rl.item_id INNER JOIN units_of_measure u ON u.id=rl.uom_id LEFT JOIN inventory_lots l ON l.id=rl.original_lot_id ORDER BY r.created_at DESC LIMIT 500"),
-        'counts' => safeRows($pdo, "SELECT c.count_number AS id, w.name AS warehouse, c.count_type AS scope, COALESCE(DATE_FORMAT(c.started_at,'%d %b · %H:%i'),DATE_FORMAT(c.created_at,'%d %b · %H:%i')) AS planned, COALESCE(u.display_name,'Sin asignar') AS owner, COALESCE(CONCAT(SUM(cl.variance_qty),' uds'),'Pendiente') AS variance, c.status FROM inventory_counts c INNER JOIN warehouses w ON w.id=c.warehouse_id LEFT JOIN app_users u ON u.id=c.created_by LEFT JOIN inventory_count_lines cl ON cl.inventory_count_id=c.id GROUP BY c.id,w.name,c.count_type,c.started_at,c.created_at,u.display_name,c.status ORDER BY c.created_at DESC LIMIT 500"),
-        'maintenance' => safeRows($pdo, "SELECT r.requisition_number AS id, COALESCE(r.external_work_order_id,'Sin OT') AS `order`, COALESCE(a.asset_name,'Sin equipo') AS asset, i.name AS item, CONCAT(l.requested_qty,' ',u.code) AS qty, DATE_FORMAT(r.needed_at,'%d %b · %H:%i') AS needed, CASE WHEN l.inventory_reservation_id IS NULL THEN 'Sin reserva' ELSE 'Reservada' END AS reservation, r.status FROM maintenance_requisitions r INNER JOIN maintenance_requisition_lines l ON l.maintenance_requisition_id=r.id INNER JOIN items i ON i.id=l.item_id INNER JOIN units_of_measure u ON u.id=l.uom_id LEFT JOIN maintenance_assets a ON a.id=r.asset_id ORDER BY r.needed_at LIMIT 500"),
-        'users' => safeRows($pdo, "SELECT u.display_name AS name,u.email,COALESCE(a.name,'Sin área') AS area,COALESCE(GROUP_CONCAT(DISTINCT r.name ORDER BY r.id SEPARATOR ', '),'Sin rol') AS role,COALESCE(GROUP_CONCAT(DISTINCT CASE WHEN uo.decision='ALLOW' AND p.action_code='VIEW' THEN m.name END ORDER BY m.sort_order SEPARATOR ', '),'Configurado por rol') AS modules,u.status FROM app_users u LEFT JOIN areas a ON a.id=u.primary_area_id LEFT JOIN user_roles ur ON ur.user_id=u.id AND ur.is_active=1 LEFT JOIN roles r ON r.id=ur.role_id LEFT JOIN user_permission_overrides uo ON uo.user_id=u.id LEFT JOIN permissions p ON p.id=uo.permission_id LEFT JOIN app_modules m ON m.id=p.module_id GROUP BY u.id,u.display_name,u.email,a.name,u.status ORDER BY u.display_name"),
+        'counts' => safeRows($pdo, "SELECT c.count_number AS id, w.name AS warehouse, c.count_type AS scope, COALESCE(DATE_FORMAT(c.started_at,'%d %b · %H:%i'),DATE_FORMAT(c.created_at,'%d %b · %H:%i')) AS planned, COALESCE(u.display_name,'Sin asignar') AS owner, CASE WHEN COUNT(cl.id)=0 THEN 'Pendiente' ELSE CONCAT(SUM(CASE WHEN ABS(cl.variance_qty)>0.000001 THEN 1 ELSE 0 END),' de ',COUNT(cl.id),' partidas con diferencia') END AS variance, c.status FROM inventory_counts c INNER JOIN warehouses w ON w.id=c.warehouse_id LEFT JOIN app_users u ON u.id=c.created_by LEFT JOIN inventory_count_lines cl ON cl.inventory_count_id=c.id GROUP BY c.id,w.name,c.count_type,c.started_at,c.created_at,u.display_name,c.status ORDER BY c.created_at DESC LIMIT 500"),
+        'auditSchedules' => buildInventoryAuditSchedules($pdo),
+        'inventoryAuditDetails' => buildInventoryAuditDetails($pdo),
+        'maintenance' => buildMaintenanceWork($pdo, $user),
+        'maintenanceUpdates' => buildMaintenanceUpdates($pdo, $user),
+        'maintenanceEvidence' => buildMaintenanceEvidence($pdo, $user),
+        'initialInventory' => safeRows($pdo, "SELECT s.session_number AS id,w.name AS warehouse,DATE_FORMAT(s.inventory_date,'%d %b %Y') AS inventoryDate,COUNT(l.id) AS lines,COALESCE(SUM(l.counted_qty),0) AS quantity,COALESCE(u.display_name,'Sistema') AS user,s.status FROM initial_inventory_sessions s INNER JOIN warehouses w ON w.id=s.warehouse_id LEFT JOIN initial_inventory_lines l ON l.initial_inventory_id=s.id LEFT JOIN app_users u ON u.id=s.created_by GROUP BY s.id,s.session_number,w.name,s.inventory_date,u.display_name,s.status ORDER BY s.created_at DESC LIMIT 500"),
+        'users' => buildUserList($pdo, $user, $isAdmin),
+        'purchaseDashboard' => buildPurchaseDashboard($pdo),
         'audit' => safeRows($pdo, "SELECT DATE_FORMAT(a.occurred_at,'%d %b · %H:%i:%s') AS date,COALESCE(u.display_name,'Sistema') AS user,COALESCE(ar.name,'Sin área') AS area,a.action_code AS action,a.entity_type AS entity,COALESCE(a.entity_id,'—') AS reference,COALESCE(a.reason,'Cambio registrado') AS detail FROM audit_log a LEFT JOIN app_users u ON u.id=a.actor_user_id LEFT JOIN areas ar ON ar.id=a.area_id ORDER BY a.occurred_at DESC LIMIT 1000"),
     ];
+    $dataPermissions=[
+        'appointments'=>'APPOINTMENTS','receipts'=>'RECEIVING','quality'=>'QUALITY','inventory'=>'INVENTORY','movements'=>'INVENTORY',
+        'forecast'=>'FORECAST','mrp'=>'MRP','production'=>'PRODUCTION','shipments'=>'SHIPPING','returns'=>'RETURNS','counts'=>'COUNTS','auditSchedules'=>'COUNTS','inventoryAuditDetails'=>'COUNTS',
+        'initialInventory'=>'INITIAL_INVENTORY','maintenance'=>'MAINTENANCE','maintenanceUpdates'=>'MAINTENANCE','maintenanceEvidence'=>'MAINTENANCE',
+        'purchaseDashboard'=>'PURCHASING','audit'=>'AUDIT_LOG'
+    ];
+    foreach($dataPermissions as $key=>$moduleCode)if(!$isAdmin&&!userHasPermission($pdo,(int)$user['id'],$moduleCode,'VIEW'))$result[$key]=[];
+    if(!$isAdmin&&!isAreaLeader($pdo,(int)$user['id']))$result['users']=[];
+    return $result;
 }
 
 function frontendModules(PDO $pdo, int $userId): array
 {
-    $map = ['DASHBOARD'=>'dashboard','APPOINTMENTS'=>'appointments','RECEIVING'=>'receiving','QUALITY'=>'quality','INVENTORY'=>'inventory','COUNTS'=>'counts','FORECAST'=>'forecast','MRP'=>'mrp','PRODUCTION'=>'production','EXTRACTION'=>'trace','SHIPPING'=>'shipping','RETURNS'=>'returns','MAINTENANCE'=>'maintenance','CATALOGS'=>'catalogs','ADMIN'=>'users','AUDIT_LOG'=>'audit'];
+    $map = ['DASHBOARD'=>'dashboard','PURCHASING'=>'purchasing','APPOINTMENTS'=>'appointments','RECEIVING'=>'receiving','QUALITY'=>'quality','INVENTORY'=>'inventory','INITIAL_INVENTORY'=>'stocktake','COUNTS'=>'counts','FORECAST'=>'forecast','MRP'=>'mrp','PRODUCTION'=>'production','EXTRACTION'=>'trace','SHIPPING'=>'shipping','RETURNS'=>'returns','MAINTENANCE'=>'maintenance','CATALOGS'=>'catalogs','AREA_TEAM'=>'users','ADMIN'=>'users','AUDIT_LOG'=>'audit'];
     $rows = safeRows($pdo, "SELECT DISTINCT m.code FROM app_modules m INNER JOIN permissions p ON p.module_id=m.id AND p.action_code='VIEW' WHERE m.is_active=1 AND (EXISTS (SELECT 1 FROM user_roles ur INNER JOIN role_permissions rp ON rp.role_id=ur.role_id WHERE ur.user_id=:role_user AND ur.is_active=1 AND rp.permission_id=p.id) OR EXISTS (SELECT 1 FROM user_permission_overrides ua WHERE ua.user_id=:allow_user AND ua.permission_id=p.id AND ua.decision='ALLOW')) AND NOT EXISTS (SELECT 1 FROM user_permission_overrides ud WHERE ud.user_id=:deny_user AND ud.permission_id=p.id AND ud.decision='DENY')", ['role_user'=>$userId,'allow_user'=>$userId,'deny_user'=>$userId]);
     $modules = ['dashboard'];
     foreach ($rows as $row) {
         if (isset($map[$row['code']])) $modules[] = $map[$row['code']];
         if ($row['code'] === 'INVENTORY') $modules[] = 'movements';
+        if ($row['code'] === 'COUNTS') $modules[] = 'stocktake';
     }
     return array_values(array_unique($modules));
 }
@@ -232,10 +264,10 @@ function traceLot(PDO $pdo, array $user, array $payload): array
     return ['lot'=>$lot,'edges'=>$edges];
 }
 
-function createOperation(PDO $pdo, array $user, array $payload): array
+function createOperation(PDO $pdo, array $user, array $payload, array $config): array
 {
     $type = requiredString($payload, 'operation_type', 'el tipo de operación', 30);
-    return match ($type) {
+    $result=match ($type) {
         'appointment' => createAppointment($pdo, $user, $payload),
         'receipt' => createReceipt($pdo, $user, $payload),
         'movement' => createMovement($pdo, $user, $payload),
@@ -250,12 +282,26 @@ function createOperation(PDO $pdo, array $user, array $payload): array
         'location' => createWarehouseLocation($pdo, $user, $payload),
         'item' => createItem($pdo, $user, $payload),
         'customer' => createCustomer($pdo, $user, $payload),
+        'bom' => createBomComponent($pdo, $user, $payload),
+        'area' => createArea($pdo, $user, $payload),
+        'role' => createRole($pdo, $user, $payload),
+        'technician' => createTechnician($pdo, $user, $payload),
+        'initialInventory' => createInitialInventory($pdo, $user, $payload),
+        'physicalCount' => createPhysicalCount($pdo, $user, $payload),
+        'auditSchedule' => createInventoryAuditSchedule($pdo, $user, $payload),
+        'forecastImport' => importForecast($pdo, $user, $payload),
+        'maintenanceRequest' => createMaintenanceWorkRequest($pdo, $user, $payload, $config),
+        'maintenanceAssignment' => assignMaintenanceTechnicians($pdo, $user, $payload, $config),
+        'maintenanceUpdate' => updateMaintenanceWork($pdo, $user, $payload, $config),
         default => failRequest('Tipo de operación no soportado.', 422),
     };
+    if(in_array($type,['movement','qualityDecision','initialInventory','physicalCount'],true))$result['mrpRunsUpdated']=recalculateCurrentForecasts($pdo,(int)$user['id']);
+    return $result;
 }
 
 function createAppointment(PDO $pdo, array $user, array $payload): array
 {
+    requireArea($pdo,$user,['COMPRAS','LOGISTICA']);
     requirePermission($pdo, (int)$user['id'], 'APPOINTMENTS', 'CREATE');
     $supplier = findOne($pdo, "SELECT id FROM suppliers WHERE supplier_code=:code AND is_active=1", ['code'=>requiredString($payload,'supplier_code','el proveedor',40)], 'El proveedor no existe o está inactivo.');
     $start = new DateTimeImmutable(requiredString($payload,'scheduled_at','la fecha y hora'), new DateTimeZone('America/Mexico_City'));
@@ -276,6 +322,7 @@ function createAppointment(PDO $pdo, array $user, array $payload): array
 
 function createReceipt(PDO $pdo, array $user, array $payload): array
 {
+    requireArea($pdo,$user,['ALMACEN']);
     requirePermission($pdo, (int)$user['id'], 'RECEIVING', 'CREATE');
     $supplierCode=requiredString($payload,'supplier_code','el proveedor',40); $originCode=requiredString($payload,'origin_code','el origen',12);
     $master=findOne($pdo,"SELECT s.id AS supplier_id,s.short_code,o.id AS origin_id,o.origin_code FROM suppliers s INNER JOIN supplier_origins o ON o.supplier_id=s.id WHERE s.supplier_code=:supplier AND o.origin_code=:origin AND s.is_active=1 AND o.is_active=1",['supplier'=>$supplierCode,'origin'=>$originCode],'El proveedor o el origen no existe.');
@@ -327,6 +374,7 @@ function createReceipt(PDO $pdo, array $user, array $payload): array
 
 function createQualityRequest(PDO $pdo, array $user, array $payload): array
 {
+    requireArea($pdo,$user,['CALIDAD','ALMACEN']);
     requirePermission($pdo,(int)$user['id'],'QUALITY','CREATE'); $reference=requiredString($payload,'reference','la recepción o lote',100);
     $target=safeRows($pdo,"SELECT rl.id AS receipt_line_id,l.id AS lot_id FROM goods_receipts r INNER JOIN goods_receipt_lines rl ON rl.receipt_id=r.id LEFT JOIN inventory_lots l ON l.id=rl.inventory_lot_id WHERE r.receipt_number=:ref UNION SELECT NULL,id FROM inventory_lots WHERE lot_code=:ref2 LIMIT 1",['ref'=>$reference,'ref2'=>$reference]);
     $requestType='OTHER'; $type=(string)($payload['quality_type']??''); if (str_contains($type,'fruta')) $requestType='INBOUND_FRUIT'; elseif(str_contains($type,'empaque'))$requestType='INBOUND_MATERIAL'; elseif(str_contains($type,'proceso'))$requestType='IN_PROCESS'; elseif(str_contains($type,'terminado'))$requestType='FINISHED_GOOD'; elseif(str_contains($type,'Devolución'))$requestType='CUSTOMER_RETURN';
@@ -339,6 +387,7 @@ function createQualityRequest(PDO $pdo, array $user, array $payload): array
 
 function createQualityDecision(PDO $pdo, array $user, array $payload): array
 {
+    requireArea($pdo,$user,['CALIDAD']);
     $disposition = requiredString($payload, 'disposition', 'el dictamen', 25);
     if (!in_array($disposition, ['APPROVED','CONDITIONAL','REJECTED'], true)) {
         failRequest('El dictamen no es válido.', 422);
@@ -382,6 +431,7 @@ function createQualityDecision(PDO $pdo, array $user, array $payload): array
 
 function createInventoryCount(PDO $pdo, array $user, array $payload): array
 {
+    requireArea($pdo,$user,['ALMACEN']);
     requirePermission($pdo,(int)$user['id'],'COUNTS','CREATE'); $warehouse=findOne($pdo,"SELECT id FROM warehouses WHERE code=:code AND is_active=1",['code'=>requiredString($payload,'warehouse_code','el almacén',30)],'El almacén no existe.');
     $types=['Cíclico'=>'CYCLE','Total'=>'FULL','Selectivo'=>'SPOT']; $type=$types[(string)($payload['count_type']??'')]??'SPOT';
     $pdo->beginTransaction(); $pdo->prepare("INSERT INTO inventory_counts (count_number,warehouse_id,count_type,status,created_by) VALUES (:number,:warehouse,:type,'PLANNED',:user)")->execute(['number'=>provisionalNumber('CON'),'warehouse'=>$warehouse['id'],'type'=>$type,'user'=>$user['id']]);
@@ -390,6 +440,7 @@ function createInventoryCount(PDO $pdo, array $user, array $payload): array
 
 function createMovement(PDO $pdo, array $user, array $payload): array
 {
+    requireArea($pdo,$user,['ALMACEN']);
     requirePermission($pdo,(int)$user['id'],'INVENTORY','POST'); $item=findOne($pdo,"SELECT id,base_uom_id,lot_controlled FROM items WHERE sku=:sku AND is_active=1",['sku'=>requiredString($payload,'sku','el SKU',80)],'El SKU no existe.');
     $lotId=null;$lot=null;$lotCode=trim((string)($payload['lot']??''));if((int)$item['lot_controlled']===1&&$lotCode==='')failRequest('El lote es obligatorio para este artículo.',422);if($lotCode!==''){$lot=findOne($pdo,"SELECT id,quality_status,lot_status FROM inventory_lots WHERE item_id=:item AND lot_code=:lot",['item'=>$item['id'],'lot'=>$lotCode],'El lote no existe para ese SKU.');$lotId=$lot['id'];}
     $from=resolveLocation($pdo,requiredString($payload,'from_location','la ubicación de origen',90));$displayType=(string)($payload['movement_type']??'');$map=['Transferencia'=>'TRANSFER','Salida a producción'=>'ISSUE_PRODUCTION','Salida a mantenimiento'=>'MAINTENANCE_ISSUE','Merma'=>'SCRAP'];if(!isset($map[$displayType]))failRequest('El tipo de movimiento no es válido.',422);$type=$map[$displayType];$qty=positiveNumber($payload,'quantity','La cantidad');$to=null;if($type==='TRANSFER')$to=resolveLocation($pdo,requiredString($payload,'to_location','la ubicación de destino',90));
@@ -399,7 +450,7 @@ function createMovement(PDO $pdo, array $user, array $payload): array
     }
     $pdo->beginTransaction();$pdo->prepare("INSERT INTO inventory_movements (movement_number,movement_type,status,movement_at,reason,created_by) VALUES (:number,:type,'DRAFT',UTC_TIMESTAMP(6),:reason,:user)")->execute(['number'=>provisionalNumber('MOV'),'type'=>$type,'reason'=>requiredString($payload,'reason','el motivo',1000),'user'=>$user['id']]);$id=(int)$pdo->lastInsertId();$number=finalNumber('MOV',$id);$pdo->prepare("UPDATE inventory_movements SET movement_number=:number WHERE id=:id")->execute(['number'=>$number,'id'=>$id]);
     $insert=$pdo->prepare("INSERT INTO inventory_movement_lines (movement_id,line_no,item_id,inventory_lot_id,warehouse_id,location_id,uom_id,quantity_delta) VALUES (:movement,:line,:item,:lot,:warehouse,:location,:uom,:qty)");$insert->execute(['movement'=>$id,'line'=>1,'item'=>$item['id'],'lot'=>$lotId,'warehouse'=>$from['warehouse_id'],'location'=>$from['location_id'],'uom'=>$item['base_uom_id'],'qty'=>-$qty]);if($to)$insert->execute(['movement'=>$id,'line'=>2,'item'=>$item['id'],'lot'=>$lotId,'warehouse'=>$to['warehouse_id'],'location'=>$to['location_id'],'uom'=>$item['base_uom_id'],'qty'=>$qty]);$pdo->commit();
-    $pdo->prepare("CALL sp_post_inventory_movement(:movement,:user)")->execute(['movement'=>$id,'user'=>$user['id']]);return ['id'=>$id,'number'=>$number];
+    $post=$pdo->prepare("CALL sp_post_inventory_movement(:movement,:user)");$post->execute(['movement'=>$id,'user'=>$user['id']]);$post->closeCursor();return ['id'=>$id,'number'=>$number];
 }
 
 function resolveLocation(PDO $pdo, string $value): array
@@ -415,24 +466,36 @@ function createCustomerReturn(PDO $pdo, array $user, array $payload): array
 
 function createUser(PDO $pdo, array $user, array $payload): array
 {
-    if (!isSuperAdmin($pdo, (int)$user['id'])) failRequest('Solo el superadministrador puede crear usuarios.', 403);
+    $isAdmin=isSuperAdmin($pdo,(int)$user['id']);
+    if (!$isAdmin && !isAreaLeader($pdo,(int)$user['id'])) failRequest('Solo el administrador del sistema o un jefe de área puede crear usuarios.',403);
     $email=mb_strtolower(requiredString($payload,'email','el correo',190));
     if (!filter_var($email,FILTER_VALIDATE_EMAIL)) failRequest('El correo no es válido.',422);
     $password=(string)($payload['password']??'');
     if (mb_strlen($password)<12) failRequest('La contraseña debe tener al menos 12 caracteres.',422);
     if (safeScalar($pdo,"SELECT COUNT(*) FROM app_users WHERE email=:email",['email'=>$email])>0) failRequest('Ya existe un usuario con ese correo.',409);
-    $area=findOne($pdo,"SELECT id FROM areas WHERE code=:code AND is_active=1",['code'=>strtoupper(requiredString($payload,'area_code','el área',30))],'El área no existe o está inactiva.');
+    $area=findOne($pdo,"SELECT id,code,name FROM areas WHERE id=:id AND is_active=1",['id'=>(int)($payload['area_id']??0)],'El área no existe o está inactiva.');
+    if (!$isAdmin && (int)$area['id']!==(int)$user['primary_area_id']) failRequest('Un jefe solo puede crear usuarios dentro de su propia área.',403);
     $roleCode=strtoupper(requiredString($payload,'role_code','el rol',40));
-    if (!in_array($roleCode,['AREA_MANAGER','OPERATOR','APPROVER','VIEWER'],true)) failRequest('El rol no es válido.',422);
+    $allowedRoles=['OPERATOR','APPROVER','VIEWER','TECHNICIAN'];
+    if (!$isAdmin && !in_array($roleCode,$allowedRoles,true)) failRequest('No puedes asignar ese rol.',422);
+    if ($isAdmin && $roleCode==='SUPER_ADMIN') failRequest('El sistema solo permite un administrador general.',422);
+    if ($roleCode==='TECHNICIAN' && $area['code']!=='MANTENIMIENTO') failRequest('El rol Técnico de mantenimiento solo puede pertenecer al área de Mantenimiento.',422);
     $role=findOne($pdo,"SELECT id FROM roles WHERE code=:code AND is_active=1",['code'=>$roleCode],'El rol no existe o está inactivo.');
-    $moduleCodes=array_values(array_unique(array_filter(array_map(fn($value)=>strtoupper(trim($value)),explode(',',requiredString($payload,'module_codes','los módulos',1000))))));
+    $rawModules=$payload['module_codes']??[];
+    if (!is_array($rawModules)) $rawModules=explode(',',(string)$rawModules);
+    $moduleCodes=array_values(array_unique(array_filter(array_map(fn($value)=>strtoupper(trim((string)$value)),$rawModules))));
     if (!$moduleCodes) failRequest('Indique al menos un módulo.',422);
-    if (in_array('ADMIN',$moduleCodes,true)) failRequest('El módulo ADMIN está reservado al superadministrador.',422);
+    if (in_array('ADMIN',$moduleCodes,true) || in_array('AUDIT_LOG',$moduleCodes,true)) failRequest('La administración global y su bitácora están reservadas al administrador del sistema.',422);
+    if (!$isAdmin) {
+        foreach($moduleCodes as $moduleCode) if(!userHasPermission($pdo,(int)$user['id'],$moduleCode,'VIEW')) failRequest('Solo puedes asignar módulos a los que tú tienes acceso.',403);
+    }
     $actionsByRole=[
         'VIEWER'=>['VIEW','EXPORT'],
         'OPERATOR'=>['VIEW','CREATE','UPDATE','POST','EXPORT'],
         'APPROVER'=>['VIEW','APPROVE','REJECT','EXPORT'],
         'AREA_MANAGER'=>['VIEW','CREATE','UPDATE','APPROVE','REJECT','POST','EXPORT'],
+        'AREA_ADMIN'=>['VIEW','CREATE','UPDATE','APPROVE','REJECT','POST','EXPORT','ADMIN'],
+        'TECHNICIAN'=>['VIEW','CREATE','UPDATE'],
     ];
     $algorithm=defined('PASSWORD_ARGON2ID')?PASSWORD_ARGON2ID:PASSWORD_BCRYPT;
     $pdo->beginTransaction();
@@ -443,7 +506,20 @@ function createUser(PDO $pdo, array $user, array $payload): array
     $grant=$pdo->prepare("INSERT INTO user_permission_overrides (user_id,permission_id,decision,changed_by) SELECT :user,p.id,'ALLOW',:admin FROM permissions p INNER JOIN app_modules m ON m.id=p.module_id WHERE m.code=:module AND m.is_active=1 AND p.action_code=:action");
     foreach($moduleCodes as $moduleCode){
         $exists=findOne($pdo,"SELECT id FROM app_modules WHERE code=:code AND is_active=1",['code'=>$moduleCode],"El módulo {$moduleCode} no existe.");
-        foreach($actionsByRole[$roleCode] as $action) $grant->execute(['user'=>$newUserId,'admin'=>$user['id'],'module'=>$moduleCode,'action'=>$action]);
+        if(isset($actionsByRole[$roleCode])){foreach($actionsByRole[$roleCode] as $action)$grant->execute(['user'=>$newUserId,'admin'=>$user['id'],'module'=>$moduleCode,'action'=>$action]);}
+        else{
+            $roleModule=safeScalar($pdo,"SELECT COUNT(*) FROM role_permissions rp INNER JOIN permissions p ON p.id=rp.permission_id INNER JOIN app_modules m ON m.id=p.module_id WHERE rp.role_id=:role AND m.code=:module",['role'=>$role['id'],'module'=>$moduleCode]);
+            if($roleModule<1)failRequest('El rol personalizado no incluye uno de los módulos seleccionados.',422);
+        }
+    }
+    if(!isset($actionsByRole[$roleCode])){
+        $allRolePermissions=safeRows($pdo,"SELECT rp.permission_id,m.code FROM role_permissions rp INNER JOIN permissions p ON p.id=rp.permission_id INNER JOIN app_modules m ON m.id=p.module_id WHERE rp.role_id=:role",['role'=>$role['id']]);
+        $deny=$pdo->prepare("INSERT INTO user_permission_overrides (user_id,permission_id,decision,changed_by) VALUES (:user,:permission,'DENY',:admin)");
+        foreach($allRolePermissions as $permission)if(!in_array($permission['code'],$moduleCodes,true))$deny->execute(['user'=>$newUserId,'permission'=>$permission['permission_id'],'admin'=>$user['id']]);
+    }
+    if($roleCode==='TECHNICIAN'){
+        $pdo->prepare("INSERT INTO maintenance_technicians (user_id,specialties,phone,created_by) VALUES (:user,:specialties,:phone,:creator)")
+            ->execute(['user'=>$newUserId,'specialties'=>optionalString($payload,'specialties',500),'phone'=>optionalString($payload,'phone',40),'creator'=>$user['id']]);
     }
     writeAudit($pdo,(int)$user['id'],'CREATE','app_user',$newUserId,['email'=>$email,'role'=>$roleCode,'modules'=>$moduleCodes]);
     $pdo->commit();
@@ -452,6 +528,7 @@ function createUser(PDO $pdo, array $user, array $payload): array
 
 function createSupplier(PDO $pdo, array $user, array $payload): array
 {
+    requireArea($pdo,$user,['COMPRAS']);
     requirePermission($pdo,(int)$user['id'],'PURCHASING','CREATE');
     $code=masterCode($payload,'supplier_code','el código de proveedor',40);
     $short=masterCode($payload,'short_code','las iniciales del proveedor',12);
@@ -465,6 +542,7 @@ function createSupplier(PDO $pdo, array $user, array $payload): array
 
 function createSupplierOrigin(PDO $pdo, array $user, array $payload): array
 {
+    requireArea($pdo,$user,['COMPRAS']);
     requirePermission($pdo,(int)$user['id'],'PURCHASING','CREATE');
     $supplier=findOne($pdo,"SELECT id FROM suppliers WHERE supplier_code=:code AND is_active=1",['code'=>masterCode($payload,'supplier_code','el proveedor',40)],'El proveedor no existe o está inactivo.');
     $code=masterCode($payload,'origin_code','el código de origen',12);
@@ -477,6 +555,7 @@ function createSupplierOrigin(PDO $pdo, array $user, array $payload): array
 
 function createWarehouse(PDO $pdo, array $user, array $payload): array
 {
+    requireArea($pdo,$user,['ALMACEN']);
     requirePermission($pdo,(int)$user['id'],'CATALOGS','CREATE');
     $code=masterCode($payload,'warehouse_code','el código de almacén',30);
     $types=['RAW_MATERIAL','PACKAGING','SPARE_PARTS','PROCESS','FINISHED_GOODS','QUARANTINE','REJECTED','RETURNS'];
@@ -489,6 +568,7 @@ function createWarehouse(PDO $pdo, array $user, array $payload): array
 
 function createWarehouseLocation(PDO $pdo, array $user, array $payload): array
 {
+    requireArea($pdo,$user,['ALMACEN']);
     requirePermission($pdo,(int)$user['id'],'INVENTORY','CREATE');
     $warehouse=findOne($pdo,"SELECT id FROM warehouses WHERE code=:code AND is_active=1",['code'=>masterCode($payload,'warehouse_code','el almacén',30)],'El almacén no existe.');
     $code=masterCode($payload,'location_code','el código de ubicación',50);$types=['RECEIVING','QUALITY_HOLD','STORAGE','PICKING','PRODUCTION','SHIPPING','REJECTED','RETURNS'];$type=requiredString($payload,'location_type','el tipo de ubicación',30);if(!in_array($type,$types,true))failRequest('El tipo de ubicación no es válido.',422);
@@ -500,6 +580,7 @@ function createWarehouseLocation(PDO $pdo, array $user, array $payload): array
 
 function createItem(PDO $pdo, array $user, array $payload): array
 {
+    requireArea($pdo,$user,['ALMACEN']);
     requirePermission($pdo,(int)$user['id'],'CATALOGS','CREATE');
     $sku=masterCode($payload,'sku','el SKU',80);if(safeScalar($pdo,"SELECT COUNT(*) FROM items WHERE sku=:sku",['sku'=>$sku])>0)failRequest('El SKU ya existe.',409);
     $category=findOne($pdo,"SELECT id FROM item_categories WHERE code=:code AND is_active=1",['code'=>masterCode($payload,'category_code','la categoría',40)],'La categoría no existe.');
@@ -512,6 +593,7 @@ function createItem(PDO $pdo, array $user, array $payload): array
 
 function createCustomer(PDO $pdo, array $user, array $payload): array
 {
+    requireArea($pdo,$user,['VENTAS']);
     requirePermission($pdo,(int)$user['id'],'SALES','CREATE');
     $code=masterCode($payload,'customer_code','el código de cliente',40);if(safeScalar($pdo,"SELECT COUNT(*) FROM customers WHERE customer_code=:code",['code'=>$code])>0)failRequest('El código de cliente ya existe.',409);
     $email=trim((string)($payload['contact_email']??''));if($email!==''&&!filter_var($email,FILTER_VALIDATE_EMAIL))failRequest('El correo de contacto no es válido.',422);

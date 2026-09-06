@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0d4a35">
   <meta name="description" content="Control integral de almacenes, trazabilidad y planeación de Oleolab">
   <meta name="robots" content="noindex,nofollow">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://ci4kash.com https://*.ci4kash.com; img-src 'self' data:; style-src 'self'; script-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://ci4kash.com https://*.ci4kash.com; img-src 'self' data: blob:; style-src 'self'; script-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'">
   <title>Oleolab · Control de Almacenes</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect rx=%2220%22 width=%22100%22 height=%22100%22 fill=%22%230d4a35%22/><path d=%22M27 18v24l23 19V38zM52 62v20l22-18V43z%22 fill=%22white%22/></svg>">
   <link rel="stylesheet" href="styles.css">
@@ -65,7 +65,7 @@
       <header class="topbar">
         <button id="menu" class="icon-btn mobile-only" aria-label="Abrir menú">☰</button>
         <div class="title-stack"><p class="eyebrow" id="page-kicker">OPERACIÓN</p><h1 id="page-title">Panel</h1></div>
-        <label class="global-search" aria-label="Buscar en la vista actual"><span>⌕</span><input id="global-search" type="search" placeholder="Buscar lote, SKU, folio…"></label>
+        <label class="global-search" aria-label="Buscar en la vista actual"><span>⌕</span><input id="global-search" type="search" placeholder="Buscar lote, código, folio…"></label>
         <button id="alerts-button" class="icon-btn alert-button" aria-label="Abrir alertas"><span>◉</span><b id="alert-count">0</b></button>
         <button id="quick-action" class="btn primary">＋ Registrar</button>
       </header>
@@ -77,27 +77,10 @@
   <dialog id="operation-dialog" class="dialog">
     <form id="operation-form" method="dialog" class="dialog-card">
       <div class="dialog-head">
-        <div><p class="eyebrow">NUEVA OPERACIÓN</p><h2>Registrar movimiento</h2></div>
+        <div><p class="eyebrow" id="operation-kicker">NUEVO REGISTRO</p><h2 id="operation-title">Registrar información</h2></div>
         <button type="button" class="icon-btn" data-close-dialog aria-label="Cerrar">×</button>
       </div>
-      <label class="field">Tipo de operación
-        <select id="operation-type" name="operation_type" required>
-          <option value="appointment">Cita de proveedor</option>
-          <option value="receipt">Recepción y pre-lote</option>
-          <option value="movement">Movimiento de inventario</option>
-          <option value="quality">Solicitud de Calidad</option>
-          <option value="qualityDecision">Dictamen de Calidad</option>
-          <option value="count">Conteo de inventario</option>
-          <option value="return">Devolución o rechazo</option>
-          <option value="user">Usuario y accesos</option>
-          <option value="supplier">Proveedor</option>
-          <option value="origin">Origen de proveedor</option>
-          <option value="warehouse">Almacén</option>
-          <option value="location">Ubicación</option>
-          <option value="item">Producto o material</option>
-          <option value="customer">Cliente</option>
-        </select>
-      </label>
+      <input id="operation-type" name="operation_type" type="hidden" value="appointment">
       <div id="operation-fields" class="form-grid"></div>
       <div class="dialog-actions">
         <button type="button" class="btn ghost" data-close-dialog>Cancelar</button>
@@ -117,6 +100,7 @@
   <div id="scrim" class="scrim hidden"></div>
 
   <script src="config.js"></script>
+  <script src="assets/xlsx.full.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

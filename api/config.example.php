@@ -18,4 +18,10 @@ return [
         'max_login_attempts' => 5,
         'lock_minutes' => 15,
     ],
+    'notifications' => [
+        // cPanel enviará los avisos mediante la función mail() de PHP.
+        'enabled' => true,
+        'from_email' => 'notificaciones@ci4kash.com',
+        'from_name' => 'Oleolab',
+    ],
 ];

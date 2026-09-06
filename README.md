@@ -12,8 +12,10 @@ Navegador -> frontend estático -> API PHP 8.3 -> MySQL 8 en localhost
 
 - `index.html`, `styles.css`, `app.js`: interfaz adaptable.
 - `config.js`: configuración pública de producción; no contiene secretos.
-- `api/`: API PHP con sesiones, permisos, auditoría y operaciones iniciales.
+- `api/`: API PHP con sesiones, permisos por área, auditoría, notificaciones y operaciones.
 - `database/schema.sql`: esquema MySQL 8.0, catálogos base, vistas, controles y procedimientos.
+- `database/migration_v1_3.sql`: actualización aditiva para una base v1.2 ya instalada.
+- `assets/xlsx.full.min.js`: lector local de Excel utilizado por el importador de Forecast.
 - `private-tools/create_admin.php`: creación por consola del único superadministrador.
 - `INSTALACION.md`: publicación paso a paso en cPanel.
 
@@ -26,9 +28,20 @@ Navegador -> frontend estático -> API PHP 8.3 -> MySQL 8 en localhost
 - Consultas preparadas, política CSP, restricción de origen y carpetas sin listado.
 - Movimientos contabilizados inmutables; las correcciones se realizan con reversas.
 
-## Estado funcional
+## Funciones de la versión 0.2
 
-Esta entrega es una base instalable para conectar y pilotear los flujos de citas, recepciones/pre-lotes, solicitudes de Calidad, movimientos, conteos y devoluciones. El esquema cubre el alcance integral. Antes de liberar la operación diaria deben cargarse los catálogos reales y ejecutarse las pruebas de aceptación descritas en `INSTALACION.md`.
+- Paneles diferenciados de Almacenes, Compras, Calidad y Mantenimiento.
+- Usuarios por área, administrador de área, roles personalizados y módulos seleccionados con casillas.
+- Altas separadas de materias primas y aceites, materiales de empaque, refacciones y producto terminado.
+- Levantamiento de inventario inicial sin cita de proveedor y auditoría física con ajuste trazable.
+- Calendario semanal de auditorías, indicador de confiabilidad y reporte Excel de diferencias con observaciones.
+- Importación de Forecast desde Excel, historial original contra revisiones y validación exacta de códigos.
+- Listas de materiales y cálculo automático de necesidades contra existencias y reservas.
+- Reporte analítico de inventario y reporte ejecutivo en Excel.
+- Solicitudes de Mantenimiento, varios técnicos, horas, bitácora, fotografías y avisos por correo.
+- Catálogos de ejemplo identificados con `[EJEMPLO]`, visibles en su área y sin cantidades ficticias de inventario.
+
+La instalación y actualización productiva se explican en `INSTALACION.md` y `ACTUALIZACION_V0.2.md`.
 
 ## Repositorios
 

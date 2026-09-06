@@ -199,11 +199,45 @@ input:focus, select:focus, textarea:focus { border-color: var(--green); box-shad
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 17px; }
 .span-2 { grid-column: 1 / -1; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
+.check-field { border: 1px solid var(--line); border-radius: 14px; padding: 15px; margin: 0; }
+.check-field legend { font-weight: 800; padding: 0 7px; }
+.check-field > p { color: var(--muted); font-size: .82rem; margin: 0 0 12px; }
+.check-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.check-card { display: grid !important; grid-template-columns: 20px 24px 1fr; align-items: center; gap: 7px !important; border: 1px solid var(--line); border-radius: 11px; padding: 11px; cursor: pointer; font-size: .82rem !important; }
+.check-card input { width: 18px; height: 18px; margin: 0; accent-color: var(--green); }
+.check-card span { color: transparent; font-weight: 900; }
+.check-card:has(input:checked) { border-color: var(--green); background: var(--green-soft); }
+.check-card:has(input:checked) span { color: var(--green); }
+.technician-grid { display: grid; gap: 10px; }
+.technician-option { display: grid !important; grid-template-columns: 20px minmax(0,1fr) 110px; align-items: center; gap: 10px !important; border: 1px solid var(--line); border-radius: 11px; padding: 10px; }
+.technician-option > input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--green); }
+.technician-option span strong,.technician-option span small { display:block; }.technician-option span small{color:var(--muted);margin-top:3px}
+.segmented { display: inline-flex; padding: 4px; border: 1px solid var(--line); border-radius: 12px; background: #fff; margin-bottom: 18px; }
+.segmented button { border: 0; background: transparent; border-radius: 8px; padding: 10px 15px; color: var(--muted); font-weight: 750; }
+.segmented button.active { background: var(--green); color: #fff; }
+.capture-card { overflow: visible; }
+.capture-lines { margin-top: 18px; border: 1px solid var(--line); border-radius: 13px; overflow: hidden; }
+.import-preview { display: grid; gap: 4px; border: 1px dashed #9dbcb0; background: var(--green-soft); padding: 15px; border-radius: 12px; }
+.import-preview span { color: var(--muted); font-size: .82rem; }
+.row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 20px 0; }
 .detail { background: #f7faf8; border-radius: 11px; padding: 12px; }
 .detail small, .detail strong { display: block; }
 .detail small { color: var(--muted); margin-bottom: 4px; font-size: .75rem; }
 .divider { border: 0; border-top: 1px solid var(--line); margin: 20px 0; }
+.maintenance-timeline { display: grid; gap: 10px; margin-top: 13px; }
+.maintenance-timeline article { border-left: 3px solid var(--green); background: #f7faf8; border-radius: 0 11px 11px 0; padding: 12px 14px; }
+.maintenance-timeline article div { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.maintenance-timeline article span { color: var(--muted); font-size: .75rem; }
+.maintenance-timeline article p { margin: 8px 0 0; color: var(--ink); line-height: 1.5; }
+.evidence-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 13px; }
+.evidence-grid figure { margin: 0; border: 1px solid var(--line); border-radius: 13px; overflow: hidden; background: #fff; }
+.evidence-preview { min-height: 180px; display: grid; place-items: center; background: #eef3f0; color: var(--muted); font-size: .8rem; overflow: hidden; }
+.evidence-preview img { display: block; width: 100%; height: 220px; object-fit: cover; cursor: zoom-in; }
+.evidence-preview img:not([src]) { display: none; }
+.evidence-grid figcaption { padding: 11px; }
+.evidence-grid figcaption strong,.evidence-grid figcaption small { display: block; overflow-wrap: anywhere; }
+.evidence-grid figcaption small { color: var(--muted); margin-top: 4px; }
 
 .alerts-panel { position: fixed; z-index: 80; top: 0; right: -430px; width: min(410px, calc(100vw - 22px)); height: 100vh; background: #f7faf8; box-shadow: -20px 0 60px rgba(8, 30, 22, .2); padding: 24px; transition: right .25s ease; overflow: auto; }
 .alerts-panel.open { right: 0; }
@@ -235,6 +269,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--green); box-shad
   .welcome, .section-head { align-items: flex-start; flex-direction: column; }
   .catalog-grid { grid-template-columns: 1fr; }
   .form-grid, .detail-grid { grid-template-columns: 1fr; }
+  .check-grid { grid-template-columns: 1fr; }
+  .evidence-grid { grid-template-columns: 1fr; }
   .span-2 { grid-column: auto; }
 }
 

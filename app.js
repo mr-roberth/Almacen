@@ -11,11 +11,11 @@
 
   const NAV = [
     { group: 'Operación', items: [
-      ['dashboard', '⌂', 'Panel general'], ['appointments', '◷', 'Citas y andenes'],
+      ['dashboard', '⌂', 'Panel de mi área'], ['purchasing', '▤', 'Planeación de Compras'], ['appointments', '◷', 'Citas y andenes'],
       ['receiving', '⇩', 'Recepciones'], ['quality', '✓', 'Calidad']
     ]},
     { group: 'Inventarios', items: [
-      ['inventory', '▦', 'Existencias'], ['movements', '↔', 'Movimientos'], ['counts', '◎', 'Auditorías de almacén']
+      ['inventory', '▦', 'Existencias'], ['movements', '↔', 'Movimientos'], ['stocktake', '◎', 'Levantamiento de inventario'], ['counts', '✓', 'Historial de auditorías']
     ]},
     { group: 'Planeación', items: [
       ['forecast', '▥', 'Forecast'], ['mrp', '∑', 'MRP y necesidades'], ['production', '▤', 'Órdenes de producción']
@@ -24,21 +24,28 @@
       ['trace', '⌁', 'Lotes y extracción'], ['shipping', '⇧', 'Embarques'], ['returns', '↩', 'Rechazos y devoluciones']
     ]},
     { group: 'Soporte', items: [
-      ['maintenance', '⚙', 'Mantenimiento'], ['catalogs', '◇', 'Catálogos'],
-      ['users', '♙', 'Usuarios y accesos'], ['audit', '≡', 'Bitácora del sistema']
+      ['maintenance', '⚙', 'Mantenimiento'], ['catalogs', '◇', 'Catálogos de mi área'],
+      ['users', '♙', 'Usuarios de mi área'], ['audit', '≡', 'Bitácora del sistema']
     ]}
   ];
 
   const PAGE_META = {
-    dashboard: ['OPERACIÓN', 'Panel general'], appointments: ['AGENDA', 'Citas y andenes'],
+    dashboard: ['MI ÁREA', 'Panel principal'], purchasing: ['COMPRAS', 'Planeación de abastecimiento'], appointments: ['AGENDA', 'Citas y andenes'],
     receiving: ['ENTRADAS', 'Recepciones'], quality: ['LIBERACIÓN', 'Calidad'],
     inventory: ['EXISTENCIAS', 'Inventario vivo'], movements: ['KARDEX', 'Movimientos'],
-    counts: ['CONTROL', 'Auditorías de almacén'], forecast: ['PLANEACIÓN', 'Forecast'],
+    stocktake: ['INVENTARIO FÍSICO', 'Levantamiento y auditoría'], counts: ['CONTROL', 'Historial de auditorías'], forecast: ['PLANEACIÓN', 'Forecast'],
     mrp: ['NECESIDADES', 'MRP'], production: ['CUMPLIMIENTO', 'Órdenes de producción'],
     trace: ['GENEALOGÍA', 'Trazabilidad de lotes'], shipping: ['SALIDAS', 'Embarques'],
     returns: ['NO CONFORMIDAD', 'Rechazos y devoluciones'], maintenance: ['INTEGRACIÓN', 'Mantenimiento'],
     catalogs: ['DATOS MAESTROS', 'Catálogos'], users: ['ADMINISTRACIÓN', 'Usuarios y accesos'],
     audit: ['SEGURIDAD', 'Bitácora del sistema']
+  };
+
+  const OPERATION_META = {
+    appointment:['COMPRAS Y LOGÍSTICA','Programar llegada'],receipt:['ALMACÉN','Registrar recepción'],movement:['INVENTARIO','Registrar movimiento'],
+    quality:['CALIDAD','Solicitar inspección'],qualityDecision:['CALIDAD','Registrar dictamen'],count:['ALMACÉN','Programar conteo'],return:['DEVOLUCIONES','Registrar devolución'],
+    user:['USUARIOS','Registrar usuario'],supplier:['COMPRAS','Registrar proveedor'],origin:['COMPRAS','Registrar origen'],warehouse:['ALMACENES','Registrar almacén'],location:['ALMACENES','Registrar ubicación'],item:['CATÁLOGOS','Registrar producto o material'],itemRaw:['ALMACÉN DE MATERIA PRIMA','Registrar materia prima o aceite'],itemPackaging:['ALMACÉN DE MATERIALES DE EMPAQUE','Registrar material de empaque'],itemSpare:['ALMACÉN DE REFACCIONES','Registrar refacción'],itemFinished:['ALMACÉN DE PRODUCTO TERMINADO','Registrar producto terminado'],customer:['VENTAS','Registrar cliente'],bom:['PLANEACIÓN DE MATERIALES','Agregar componente a una lista de materiales'],
+    area:['ADMINISTRACIÓN','Registrar área'],role:['ADMINISTRACIÓN','Registrar rol'],technician:['MANTENIMIENTO','Registrar técnico'],forecastImport:['PLANEACIÓN','Importar Forecast desde Excel'],maintenanceRequest:['MANTENIMIENTO','Registrar solicitud'],maintenanceAssignment:['MANTENIMIENTO','Asignar técnicos'],maintenanceUpdate:['MANTENIMIENTO','Responder tarea'],auditSchedule:['AUDITORÍA DE INVENTARIO','Programar días de auditoría']
   };
 
   const operationFields = {
@@ -53,7 +60,7 @@
       <label>Folio de cita<input name="appointment" placeholder="CIT-2026-0042"></label>
       <label>Código de proveedor<input name="supplier_code" required placeholder="PROV-001"></label>
       <label>Código de origen<input name="origin_code" required placeholder="URU"></label>
-      <label>SKU recibido<input name="sku" required placeholder="MP-AGU-HASS"></label>
+      <label>Código del producto recibido<input name="sku" required placeholder="MP-AGU-HASS"></label>
       <label>Peso esperado (kg)<input name="expected_weight" type="number" min="0.001" step="0.001" required></label>
       <label>Peso recibido (kg)<input name="received_weight" type="number" min="0.001" step="0.001" required></label>
       <label>Almacén<input name="warehouse_code" required placeholder="MP"></label>
@@ -61,7 +68,7 @@
       <label class="span-2">Observaciones<textarea name="notes" rows="3"></textarea></label>`,
     movement: `
       <label>Movimiento<select name="movement_type" required><option>Transferencia</option><option>Salida a producción</option><option>Salida a mantenimiento</option><option>Merma</option></select></label>
-      <label>SKU<input name="sku" required></label>
+      <label>Código del producto o material<input name="sku" required></label>
       <label>Lote<input name="lot" placeholder="Obligatorio si el artículo controla lote"></label>
       <label>Cantidad<input name="quantity" type="number" min="0.001" step="0.001" required></label>
       <label>Origen<input name="from_location" required placeholder="Código almacén/ubicación, ej. MP/A01"></label>
@@ -83,17 +90,19 @@
     return: `
       <label>Código de cliente<input name="customer_code" required placeholder="CLI-001"></label>
       <label>Referencia<input name="reference" required placeholder="Pedido, embarque o recepción"></label>
-      <label>SKU<input name="sku" required></label>
+      <label>Código del producto<input name="sku" required></label>
       <label>Lote<input name="lot"></label>
       <label>Cantidad<input name="quantity" type="number" min="0.001" step="0.001" required></label>
       <label class="span-2">Motivo<textarea name="reason" rows="3" required></textarea></label>`,
-    user: `
-      <label>Nombre completo<input name="display_name" required maxlength="160"></label>
-      <label>Correo electrónico<input name="email" type="email" required maxlength="190"></label>
-      <label>Código de área<input name="area_code" required placeholder="Ej. ALMACEN"></label>
-      <label>Rol<select name="role_code" required><option value="AREA_MANAGER">Responsable de área</option><option value="OPERATOR">Operador</option><option value="APPROVER">Aprobador</option><option value="VIEWER">Consulta</option></select></label>
-      <label class="span-2">Módulos autorizados<input name="module_codes" required placeholder="Ej. RECEIVING,INVENTORY,COUNTS"></label>
-      <label class="span-2">Contraseña inicial segura<input name="password" type="password" minlength="12" autocomplete="new-password" required></label>`,
+    user: '',
+    area: `<label class="span-2">Nombre del área<input name="area_name" required maxlength="120" placeholder="Ej. Almacén de materiales de empaque"></label>`,
+    role: '',
+    technician: '',
+    maintenanceRequest: '',
+    maintenanceAssignment: '',
+    maintenanceUpdate: '',
+    auditSchedule: '',
+    bom: '',
     supplier: `
       <label>Código de proveedor<input name="supplier_code" required maxlength="40" placeholder="PROV-001"></label>
       <label>Iniciales para pre-lote<input name="short_code" required maxlength="12" placeholder="AGV"></label>
@@ -119,11 +128,11 @@
       <label>Tipo<select name="location_type" required><option value="RECEIVING">Recibo</option><option value="QUALITY_HOLD">Cuarentena</option><option value="STORAGE">Almacenamiento</option><option value="PICKING">Surtido</option><option value="PRODUCTION">Producción</option><option value="SHIPPING">Embarque</option><option value="REJECTED">Rechazado</option><option value="RETURNS">Devoluciones</option></select></label>
       <label>Bloqueada<select name="is_blocked"><option value="0">No</option><option value="1">Sí</option></select></label>`,
     item: `
-      <label>SKU<input name="sku" required maxlength="80"></label>
+      <label>Código del producto o material<input name="sku" required maxlength="80"></label>
       <label>Nombre<input name="item_name" required maxlength="190"></label>
-      <label>Tipo<select name="item_type" required><option value="RAW_FRUIT">Fruta</option><option value="RAW_OTHER">Otra materia prima</option><option value="PACKAGING">Empaque</option><option value="SPARE_PART">Refacción</option><option value="CONSUMABLE">Consumible</option><option value="BULK_OIL">Aceite a granel</option><option value="FINISHED_GOOD">Producto terminado</option><option value="SERVICE">Servicio</option></select></label>
+      <label>Tipo<select name="item_type" required><option value="RAW_FRUIT">Aguacate en fruta</option><option value="BULK_OIL">Aceite crudo, para refinar o listo para envasar</option><option value="RAW_OTHER">Otra materia prima</option><option value="PACKAGING">Botella, tapa, etiqueta, caja u otro material de empaque</option><option value="SPARE_PART">Refacción</option><option value="CONSUMABLE">Consumible</option><option value="FINISHED_GOOD">Producto terminado</option><option value="SERVICE">Servicio</option></select></label>
       <label>Categoría<input name="category_code" required placeholder="FRUIT, PACK, SPARE, FG..."></label>
-      <label>Unidad base<input name="uom_code" required placeholder="KG, L, EA, BOX..."></label>
+      <label>Unidad base<select name="uom_code" required><option value="KG">Kilogramos</option><option value="L">Litros</option><option value="EA">Piezas</option><option value="BOX">Cajas</option><option value="BEAN">Contenedores de fruta</option><option value="PALLET">Tarimas</option></select></label>
       <label>Control por lote<select name="lot_controlled"><option value="1">Sí</option><option value="0">No</option></select></label>
       <label>Requiere Calidad<select name="quality_required"><option value="1">Sí</option><option value="0">No</option></select></label>
       <label>Punto de reorden<input name="reorder_point" type="number" min="0" step="0.001" value="0"></label>`,
@@ -230,7 +239,9 @@
 
   const state = {
     token: sessionStorage.getItem(TOKEN_KEY) || '', data: null,
-    page: location.hash.replace('#/', '') || 'dashboard', query: '', demo: false, traceResult: null
+    page: location.hash.replace('#/', '') || 'dashboard', query: '', demo: false, traceResult: null,
+    inventoryCaptureMode: 'initial', inventoryCaptureLines: [], forecastPreview: null, forecastFile: null,
+    evidenceUrls: []
   };
 
   document.addEventListener('DOMContentLoaded', init);
@@ -240,10 +251,10 @@
     $('#demo-login').addEventListener('click', startDemo);
     $('#logout').addEventListener('click', logout);
     $('#menu').addEventListener('click', toggleSidebar);
-    $('#quick-action').addEventListener('click', openOperation);
-    $('#operation-type').addEventListener('change', renderOperationFields);
+    $('#quick-action').addEventListener('click', () => openOperation($('#quick-action').dataset.operation));
     $('#operation-form').addEventListener('submit', submitOperation);
     $$('[data-close-dialog]').forEach(button => button.addEventListener('click', closeDialogs));
+    $('#detail-dialog').addEventListener('close', revokeEvidenceUrls);
     $('#alerts-button').addEventListener('click', openAlerts);
     $('#close-alerts').addEventListener('click', closeAlerts);
     $('#scrim').addEventListener('click', closeOverlays);
@@ -344,6 +355,9 @@
     const [kicker, title] = PAGE_META[page] || PAGE_META.dashboard;
     $('#page-kicker').textContent = kicker;
     $('#page-title').textContent = title;
+    const quickMap={appointments:'appointment',receiving:'receipt',quality:'quality',inventory:'movement',movements:'movement',counts:'auditSchedule',forecast:'forecastImport',maintenance:'maintenanceRequest',users:'user'};
+    $('#quick-action').dataset.operation=quickMap[page]||'';
+    $('#quick-action').classList.toggle('hidden',!quickMap[page]);
     renderNav();
     renderPage();
     $('#view').focus({ preventScroll: true });
@@ -351,9 +365,9 @@
 
   function renderPage() {
     const renderer = {
-      dashboard: renderDashboard, appointments: renderAppointments, receiving: renderReceiving,
+      dashboard: renderDashboard, purchasing: renderPurchasing, appointments: renderAppointments, receiving: renderReceiving,
       quality: renderQuality, inventory: renderInventory, movements: renderMovements,
-      counts: renderCounts, forecast: renderForecast, mrp: renderMrp,
+      stocktake: renderStocktake, counts: renderCounts, forecast: renderForecast, mrp: renderMrp,
       production: renderProduction, trace: renderTrace, shipping: renderShipping,
       returns: renderReturns, maintenance: renderMaintenance, catalogs: renderCatalogs,
       users: renderUsers, audit: renderAudit
@@ -364,10 +378,28 @@
 
   function renderDashboard() {
     const d = state.data;
+    if (!state.demo && d.areaDashboard) {
+      const area = d.areaDashboard;
+      const metrics = area.metrics || [];
+      const critical = area.criticalMaterials || [];
+      const flow = area.highFlow || [];
+      const planShortages = area.planShortages || [];
+      const compliance = area.forecastCompliance || [];
+      $('#view').innerHTML = `
+        <div class="welcome"><div><p class="eyebrow">${h(d.user.areaName)}</p><h2>${h(area.title)}</h2><p class="muted">Información y decisiones correspondientes a tu área.</p></div><div class="actions"><button class="btn ghost" data-executive-report>Descargar reporte ejecutivo</button>${allowed('inventory') ? '<button class="btn primary" data-page-link="inventory">Ver existencias</button>' : ''}</div></div>
+        <div class="metric-grid">${metrics.map((item, index) => metric(item.label, n(item.value), ['▦','◷','!','✓'][index % 4], item.note, item.tone || '')).join('')}</div>
+        <div class="content-grid">
+          <section class="card"><div class="card-head"><div><h3>Materiales críticos</h3><p>Existencia disponible contra el punto de reorden.</p></div></div>${table(['Material','Existencia disponible','Punto de reorden','Estado'], critical.map(x => [cell(x.item, x.sku), `${n(x.available)} ${x.uom}`, n(x.reorder_point), badge(x.status)]), 'No hay materiales críticos.')}</section>
+          <section class="card"><div class="card-head"><div><h3>Mayor salida o consumo</h3><p>Últimos treinta días.</p></div></div>${table(['Material','Cantidad utilizada'], flow.map(x => [cell(x.item, x.sku), `${n(x.quantity)} ${x.uom}`]), 'Todavía no hay consumo registrado.', 'compact')}</section>
+        </div>
+        <section class="card page-gap"><div class="card-head"><div><h3>Faltantes para cumplir el plan de fabricación</h3><p>Necesidad neta calculada con el Forecast, las listas de materiales y las existencias.</p></div></div>${table(['Material o materia prima','Cantidad faltante','Fecha requerida'],planShortages.map(x=>[cell(x.item,`Código: ${x.sku}`),`${n(x.shortage)} ${x.uom}`,dateFmt(x.needDate)]),'No hay faltantes calculados para el plan vigente.')}</section>
+        <section class="card page-gap"><div class="card-head"><div><h3>Cumplimiento del Forecast</h3><p>Producto terminado disponible frente al plan vigente.</p></div></div>${table(['Producto terminado','Forecast vigente','Disponible','Cobertura'], compliance.map(x => [cell(x.item, x.sku), n(x.forecastQty), n(x.availableQty), badge(`${n(x.compliance)}%`)]), 'Importa el Forecast y registra existencias para calcular la cobertura.')}</section>`;
+      return;
+    }
     $('#view').innerHTML = `
       <div class="welcome"><div><h2>Operación de hoy</h2><p class="muted">Existencias, compromisos y eventos que requieren decisión.</p></div><div class="actions"><button class="btn ghost" data-page-link="forecast">Comparar Forecast</button><button class="btn primary" data-open-operation>＋ Registrar operación</button></div></div>
       <div class="metric-grid">
-        ${metric('SKU con existencia', n(d.metrics.inventorySkus), '▦', 'Inventario contabilizado')}
+        ${metric('Productos con existencia', n(d.metrics.inventorySkus), '▦', 'Inventario contabilizado')}
         ${metric('Faltantes críticos', n(d.metrics.criticalShortages), '!', 'Necesidades MRP abiertas', 'danger')}
         ${metric('Pendientes de Calidad', n(d.metrics.pendingQuality), '✓', 'Recepciones en espera', 'warning')}
         ${metric('Órdenes en riesgo', n(d.metrics.ordersAtRisk), '◷', 'Fecha prometida comprometida', 'danger')}
@@ -391,6 +423,19 @@
       <section class="card">${table(['Hora','Folio','Tipo','Proveedor / transportista','Material','Ubicación','Estado'], rows.map(x => [x.time, folio(x.id), x.type, cell(x.supplier, x.material), x.material, x.dock, badge(x.status)]), 'No hay citas con ese criterio.')}</section>`;
   }
 
+  function renderPurchasing() {
+    const data = state.data.purchaseDashboard || { upcoming: [], needs: [] };
+    const upcoming = filterRows(data.upcoming || [], ['id', 'scheduled', 'supplier', 'material', 'status']);
+    const needs = filterRows(data.needs || [], ['item', 'supplier', 'needDate']);
+    $('#view').innerHTML = `
+      <div class="section-head"><div><h2>Planeación de Compras</h2><p class="muted">Llegadas previstas, citas pendientes y materiales requeridos por el plan de fabricación.</p></div><div class="actions"><button class="btn primary" data-open-operation="appointment">Programar llegada</button></div></div>
+      <div class="metric-grid">${metric('Pedidos o entregas por llegar',n(upcoming.length),'▤','Agenda próxima')}${metric('Citas por confirmar',n(upcoming.filter(x=>/PLANNED|SENT|POR CONFIRMAR/i.test(x.status)).length),'◷','Dar seguimiento','warning')}${metric('Materiales necesarios',n(needs.length),'!','Faltantes del plan',needs.length?'danger':'')}${metric('Llegadas retrasadas',n(upcoming.filter(x=>Number(x.delayMinutes)>0).length),'⌛','Fuera de horario',upcoming.some(x=>Number(x.delayMinutes)>0)?'danger':'')}</div>
+      <div class="equal-grid">
+        <section class="card"><div class="card-head"><div><h3>Próximas llegadas</h3><p>Proveedor, material, fecha y situación de la cita.</p></div></div>${table(['Cita','Fecha y hora','Proveedor','Material','Estado'],upcoming.map(x=>[folio(x.id),x.scheduled,x.supplier,x.material,badge(x.status)]),'No hay entregas programadas.')}</section>
+        <section class="card"><div class="card-head"><div><h3>Necesidades de compra</h3><p>Faltantes calculados a partir del Forecast y las listas de materiales.</p></div></div>${table(['Material','Cantidad faltante','Fecha requerida','Proveedor sugerido'],needs.map(x=>[cell(x.item,x.sku),`${n(x.shortage)} ${x.uom}`,dateFmt(x.needDate),x.supplier]),'Ejecuta el cálculo de necesidades para obtener sugerencias.')}</section>
+      </div>`;
+  }
+
   function renderReceiving() {
     const rows = filterRows(state.data.receipts, ['id', 'prelot', 'supplier', 'item', 'quality', 'status']);
     $('#view').innerHTML = sectionHeader('Recepciones y pre-lotes', 'Confirma la cita, genera el lote definitivo y solicita la inspección de Calidad.', 'Nueva recepción', 'receipt') + `
@@ -406,8 +451,8 @@
   function renderInventory() {
     const rows = filterRows(state.data.inventory, ['sku', 'item', 'type', 'warehouse', 'lot', 'status']);
     const totalAvailable = rows.reduce((sum, x) => sum + Number(x.available), 0);
-    $('#view').innerHTML = sectionHeader('Inventario disponible', 'El saldo proviene exclusivamente de movimientos contabilizados y reservas vigentes.', 'Nuevo movimiento', 'movement', true) + `
-      <div class="metric-grid">${metric('Registros visibles', n(rows.length), '▦', 'Por SKU, lote y ubicación')}${metric('Disponible acumulado', n(totalAvailable), '✓', 'Unidades mixtas; consultar detalle')}${metric('Sin disponible', n(rows.filter(x => x.available <= 0).length), '!', 'Requieren atención', 'danger')}${metric('En nivel bajo', n(rows.filter(x => ['Crítico','Bajo'].includes(x.status)).length), '◷', 'Contra mínimo y punto de reorden', 'warning')}</div>
+    $('#view').innerHTML = sectionHeader('Inventario disponible', 'Consulta botellas, tapas, etiquetas, cajas, fruta, aceites, refacciones y producto terminado por su nombre.', 'Nuevo movimiento', 'movement', true) + `
+      <div class="metric-grid">${metric('Registros visibles', n(rows.length), '▦', 'Por producto, lote y ubicación')}${metric('Disponible acumulado', n(totalAvailable), '✓', 'Unidades mixtas; consultar detalle')}${metric('Sin disponible', n(rows.filter(x => x.available <= 0).length), '!', 'Requieren atención', 'danger')}${metric('En nivel bajo', n(rows.filter(x => ['Crítico','Bajo'].includes(x.status)).length), '◷', 'Contra mínimo y punto de reorden', 'warning')}</div>
       <section class="card">${inventoryTable(rows)}</section>`;
   }
 
@@ -420,18 +465,18 @@
     const rows = filterRows(state.data.forecast, ['customer', 'sku', 'item', 'impact', 'status']);
     const changed = rows.filter(x => Number(x.delta) !== 0).length;
     const increased = rows.filter(x => Number(x.delta) > 0).length;
-    $('#view').innerHTML = sectionHeader('Forecast original vs. vigente', 'Cada importación crea una versión y conserva el plan anterior para medir su impacto.', 'Importar nueva versión', null, true) + `
+    $('#view').innerHTML = sectionHeader('Forecast original vs. vigente', 'Importa Excel; cada carga conserva la versión anterior y valida los códigos de producto terminado.', 'Importar archivo de Excel', 'forecastImport', true) + `
       <div class="equal-grid"><section class="card card-pad"><p class="eyebrow">COMPARACIÓN</p><h3>${n(rows.length)} líneas vigentes</h3><p>Plan original contra la versión marcada como actual.</p></section><section class="card card-pad"><p class="eyebrow">IMPACTO</p><h3>${n(changed)} cambios detectados</h3><p>${n(increased)} incrementos que deben volver a evaluarse en MRP.</p></section></div>
-      <section class="card page-gap">${table(['Cliente','SKU / producto','Original','Vigente','Cambio','Impacto','Cobertura'], rows.map(x => [x.customer, cell(x.sku, x.item), numCell(x.original), numCell(x.current), delta(x.delta), x.impact, badge(x.status)]), 'No hay cambios con ese criterio.')}</section>`;
+      <section class="card page-gap">${table(['Cliente','Producto terminado','Original','Vigente','Cambio','Impacto','Cobertura'], rows.map(x => [x.customer, cell(x.item, `Código: ${x.sku}`), numCell(x.original), numCell(x.current), delta(x.delta), x.impact, badge(x.status)]), 'No hay cambios con ese criterio.')}</section>`;
   }
 
   function renderMrp() {
     const rows = filterRows(state.data.mrp, ['item', 'sku', 'needDate', 'action', 'status']);
     const shortages = rows.filter(x => Number(x.shortage) > 0);
     const coveragePct = rows.length ? Math.round((rows.length - shortages.length) / rows.length * 100) : 0;
-    $('#view').innerHTML = sectionHeader('Necesidades calculadas', 'Explosión de materiales contra existencias, reservas, entradas programadas y tiempos de entrega.', 'Ejecutar MRP', null, true) + `
-      <div class="metric-grid">${metric('Necesidades', n(rows.length), '∑', 'Última ejecución completada')}${metric('Faltantes', n(shortages.length), '!', 'SKU con necesidad neta', shortages.length ? 'danger' : '')}${metric('Cantidad faltante', n(shortages.reduce((sum, x) => sum + Number(x.shortage || 0), 0)), '▤', 'Consultar unidades por renglón')}${metric('Cobertura de renglones', `${n(coveragePct)}%`, '✓', 'Sin faltante neto', coveragePct < 75 ? 'warning' : '')}</div>
-      <section class="card">${table(['Material','Requerido','Disponible','Entradas','Faltante','Fecha necesidad','Acción sugerida','Estado'], rows.map(x => [cell(x.sku, x.item), numCell(x.required), numCell(x.available), numCell(x.incoming), numCell(x.shortage, x.shortage > 0 ? 'negative' : 'positive'), dateFmt(x.needDate), x.action, badge(x.status)]), 'No hay necesidades con ese criterio.')}</section>`;
+    $('#view').innerHTML = sectionHeader('Necesidades calculadas', 'Se recalculan automáticamente al importar un Forecast, cambiar una lista de materiales o afectar existencias.', null, null, true) + `
+      <div class="metric-grid">${metric('Necesidades', n(rows.length), '∑', 'Último cálculo completado')}${metric('Faltantes', n(shortages.length), '!', 'Materiales con necesidad neta', shortages.length ? 'danger' : '')}${metric('Cantidad faltante', n(shortages.reduce((sum, x) => sum + Number(x.shortage || 0), 0)), '▤', 'Consultar unidades por renglón')}${metric('Cobertura de renglones', `${n(coveragePct)}%`, '✓', 'Sin faltante neto', coveragePct < 75 ? 'warning' : '')}</div>
+      <section class="card">${table(['Material','Requerido','Disponible','Entradas','Faltante','Fecha necesidad','Acción sugerida','Estado'], rows.map(x => [cell(x.item, `Código: ${x.sku}`), numCell(x.required), numCell(x.available), numCell(x.incoming), numCell(x.shortage, x.shortage > 0 ? 'negative' : 'positive'), dateFmt(x.needDate), x.action, badge(x.status)]), 'Importa un Forecast y registra la lista de materiales de cada producto terminado.')}</section>`;
   }
 
   function renderProduction() {
@@ -443,7 +488,7 @@
   function renderTrace() {
     if (!state.demo) {
       const result = state.traceResult;
-      const details = result ? `<section class="card card-pad"><div class="detail-grid"><div class="detail"><small>Lote</small><strong>${h(result.lot.lot_code)}</strong></div><div class="detail"><small>SKU</small><strong>${h(result.lot.sku)}</strong></div><div class="detail"><small>Artículo</small><strong>${h(result.lot.item)}</strong></div><div class="detail"><small>Calidad</small><strong>${h(result.lot.quality_status)}</strong></div><div class="detail"><small>Proveedor</small><strong>${h(result.lot.supplier || 'Sin proveedor')}</strong></div><div class="detail"><small>Origen</small><strong>${h(result.lot.origin || 'Sin origen')}</strong></div></div></section><section class="card page-gap">${table(['Proceso','Lote origen','Lote resultado','Cantidad utilizada','Contribución'], result.edges.map(x => [folio(x.batch_code), folio(x.parent_lot_code), folio(x.child_lot_code), n(x.parent_qty_used), x.contribution_pct == null ? '—' : `${n(x.contribution_pct)}%`]), 'El lote existe, pero todavía no tiene vínculos de transformación.')}</section>` : '<section class="card card-pad"><div class="empty"><strong>Busca un lote</strong>Se mostrarán sus datos y vínculos de transformación ascendentes y descendentes.</div></section>';
+      const details = result ? `<section class="card card-pad"><div class="detail-grid"><div class="detail"><small>Lote</small><strong>${h(result.lot.lot_code)}</strong></div><div class="detail"><small>Código del producto</small><strong>${h(result.lot.sku)}</strong></div><div class="detail"><small>Producto o material</small><strong>${h(result.lot.item)}</strong></div><div class="detail"><small>Calidad</small><strong>${h(result.lot.quality_status)}</strong></div><div class="detail"><small>Proveedor</small><strong>${h(result.lot.supplier || 'Sin proveedor')}</strong></div><div class="detail"><small>Origen</small><strong>${h(result.lot.origin || 'Sin origen')}</strong></div></div></section><section class="card page-gap">${table(['Proceso','Lote origen','Lote resultado','Cantidad utilizada','Contribución'], result.edges.map(x => [folio(x.batch_code), folio(x.parent_lot_code), folio(x.child_lot_code), n(x.parent_qty_used), x.contribution_pct == null ? '—' : `${n(x.contribution_pct)}%`]), 'El lote existe, pero todavía no tiene vínculos de transformación.')}</section>` : '<section class="card card-pad"><div class="empty"><strong>Busca un lote</strong>Se mostrarán sus datos y vínculos de transformación ascendentes y descendentes.</div></section>';
       $('#view').innerHTML = `<div class="section-head"><div><h2>Historia completa del lote</h2><p class="muted">Consulta desde el proveedor hasta los lotes resultantes de extracción y envasado.</p></div><div class="filters"><input id="trace-search" aria-label="Código de lote" placeholder="Código exacto de lote"><button class="btn primary" id="trace-button">Buscar lote</button></div></div>${details}`;
       $('#trace-button').addEventListener('click', searchTrace);
       $('#trace-search').addEventListener('keydown', event => { if (event.key === 'Enter') searchTrace(); });
@@ -485,40 +530,158 @@
       <section class="card">${table(['Folio','Origen','Cliente / proveedor','Referencia','Producto / lote','Cantidad','Motivo','Estado'], rows.map(x => [folio(x.id), x.type, x.partner, folio(x.reference), cell(x.item, x.lot), x.qty, x.reason, badge(x.status)]), 'No hay devoluciones con ese criterio.')}</section>`;
   }
 
+  function renderStocktake() {
+    const lookups = state.data.lookups || {};
+    const warehouses = lookups.warehouses || [];
+    const locations = lookups.locations || [];
+    const items = lookups.items || [];
+    const isAudit = state.inventoryCaptureMode === 'audit';
+    const history = isAudit ? (state.data.counts || []) : (state.data.initialInventory || []);
+    $('#view').innerHTML = `
+      <div class="section-head"><div><h2>Levantamiento de inventario</h2><p class="muted">Captura existencias actuales sin cita de proveedor o compara un conteo físico contra el sistema.</p></div></div>
+      <div class="segmented" role="tablist"><button class="${isAudit?'':'active'}" data-capture-mode="initial">Inventario inicial</button><button class="${isAudit?'active':''}" data-capture-mode="audit">Auditoría física</button></div>
+      <section class="card card-pad capture-card">
+        <div class="form-grid">
+          <label>Almacén<select id="capture-warehouse" required><option value="">Selecciona un almacén</option>${warehouses.map(x=>`<option value="${h(x.id)}">${h(x.name)}</option>`).join('')}</select></label>
+          <label>Fecha del levantamiento<input id="capture-date" type="date" value="${new Date().toISOString().slice(0,10)}" required></label>
+          <label>Ubicación<select id="capture-location" required><option value="">Selecciona primero el almacén</option>${locations.map(x=>`<option value="${h(x.id)}" data-warehouse="${h(x.warehouse_id)}">${h(x.warehouse_name)} · ${h(x.name)}</option>`).join('')}</select></label>
+          <label>Producto o material<select id="capture-item" required><option value="">Selecciona por nombre</option>${items.map(x=>`<option value="${h(x.id)}">${h(x.name)} · ${h(x.uom_name)}</option>`).join('')}</select></label>
+          <label>Lote<input id="capture-lot" maxlength="100" placeholder="Solo cuando el material controla lote"></label>
+          <label>Estado de Calidad<select id="capture-quality"><option value="APPROVED">Liberado</option><option value="CONDITIONAL">Liberado con condición</option><option value="PENDING">Pendiente de revisión</option><option value="REJECTED">Rechazado y bloqueado</option></select></label>
+          <label>Cantidad física<input id="capture-quantity" type="number" min="0" step="0.001" required></label>
+          <label>Observaciones<input id="capture-line-notes" maxlength="500"></label>
+        </div>
+        <div class="dialog-actions"><button class="btn ghost" id="capture-add-line">Agregar partida</button></div>
+        <div id="capture-lines" class="capture-lines">${captureLinesTable()}</div>
+        <label class="field page-gap">Motivo o referencia del levantamiento<textarea id="capture-notes" rows="2" required placeholder="Ej. Inventario físico inicial autorizado por la jefatura"></textarea></label>
+        <div class="dialog-actions"><button class="btn primary" id="capture-save" ${state.inventoryCaptureLines.length?'':'disabled'}>${isAudit?'Guardar auditoría y ajustar diferencias':'Contabilizar inventario inicial'}</button></div>
+      </section>
+      <section class="card page-gap"><div class="card-head"><div><h3>${isAudit?'Auditorías realizadas':'Levantamientos realizados'}</h3><p>Historial completo por almacén y responsable.</p></div></div>${isAudit?table(['Folio','Almacén','Tipo','Fecha','Responsable','Diferencia','Estado'],history.map(x=>[folio(x.id),x.warehouse,x.scope,x.planned,x.owner,x.variance,badge(x.status)]),'No hay auditorías registradas.'):table(['Folio','Almacén','Fecha','Partidas','Cantidad','Responsable','Estado'],history.map(x=>[folio(x.id),x.warehouse,x.inventoryDate,n(x.lines),n(x.quantity),x.user,badge(x.status)]),'No hay levantamientos iniciales.')}</section>`;
+    $$('[data-capture-mode]').forEach(button=>button.addEventListener('click',()=>{state.inventoryCaptureMode=button.dataset.captureMode;state.inventoryCaptureLines=[];renderStocktake();}));
+    $('#capture-warehouse').addEventListener('change', filterCaptureLocations);
+    $('#capture-add-line').addEventListener('click', addCaptureLine);
+    $('#capture-save').addEventListener('click', saveCapture);
+    bindCaptureLineActions();
+    filterCaptureLocations();
+  }
+
+  function filterCaptureLocations() {
+    const warehouse = $('#capture-warehouse')?.value || '';
+    $$('#capture-location option[data-warehouse]').forEach(option => { option.hidden = option.dataset.warehouse !== warehouse; });
+    if ($('#capture-location')?.selectedOptions[0]?.hidden) $('#capture-location').value = '';
+  }
+
+  function addCaptureLine() {
+    const warehouseId=$('#capture-warehouse').value,locationId=$('#capture-location').value,itemId=$('#capture-item').value;
+    const quantity=Number($('#capture-quantity').value);if(!warehouseId||!locationId||!itemId||!Number.isFinite(quantity)||quantity<0||(state.inventoryCaptureMode==='initial'&&quantity===0))return toast(state.inventoryCaptureMode==='initial'?'La existencia inicial debe ser mayor que cero.':'Completa almacén, ubicación, material y cantidad.',true);
+    const lookups=state.data.lookups;const item=lookups.items.find(x=>String(x.id)===String(itemId));const location=lookups.locations.find(x=>String(x.id)===String(locationId));if(!item||!location)return toast('La selección no es válida.',true);
+    const lot=$('#capture-lot').value.trim();if(Number(item.lot_controlled)===1&&!lot)return toast(`Indica el lote de ${item.name}.`,true);
+    const duplicate=state.inventoryCaptureLines.some(line=>String(line.item_id)===String(itemId)&&String(line.location_id)===String(locationId)&&line.lot_code===lot);if(duplicate)return toast('Ese producto, ubicación y lote ya están en el levantamiento.',true);
+    state.inventoryCaptureLines.push({item_id:Number(itemId),item_name:item.name,location_id:Number(locationId),location_name:location.name,lot_code:lot,quantity,quality_status:$('#capture-quality').value,notes:$('#capture-line-notes').value.trim(),uom:item.uom_name});
+    $('#capture-lines').innerHTML=captureLinesTable();$('#capture-save').disabled=false;bindCaptureLineActions();$('#capture-item').value='';$('#capture-lot').value='';$('#capture-quantity').value='';$('#capture-line-notes').value='';
+  }
+
+  function bindCaptureLineActions(){
+    $$('[data-remove-capture]').forEach(button=>button.addEventListener('click',()=>{state.inventoryCaptureLines.splice(Number(button.dataset.removeCapture),1);$('#capture-lines').innerHTML=captureLinesTable();$('#capture-save').disabled=!state.inventoryCaptureLines.length;bindCaptureLineActions();}));
+  }
+
+  function captureLinesTable() {
+    const rows=state.inventoryCaptureLines;return table(['Producto o material','Ubicación','Lote','Cantidad','Calidad',''],rows.map((x,index)=>[x.item_name,x.location_name,x.lot_code||'Sin lote',`${n(x.quantity)} ${x.uom}`,qualityLabel(x.quality_status),trusted(`<button class="btn danger small" type="button" data-remove-capture="${index}">Quitar</button>`)]),'Agrega las partidas que contaste físicamente.');
+  }
+
+  async function saveCapture() {
+    if(!state.inventoryCaptureLines.length)return toast('Agrega al menos una partida.',true);const notes=$('#capture-notes').value.trim();if(!notes)return toast('Escribe el motivo o referencia del levantamiento.',true);
+    const payload={operation_type:state.inventoryCaptureMode==='audit'?'physicalCount':'initialInventory',warehouse_id:Number($('#capture-warehouse').value),inventory_date:$('#capture-date').value,notes,lines:state.inventoryCaptureLines};
+    if(!payload.warehouse_id)return toast('Selecciona el almacén.',true);setLoading(true,state.inventoryCaptureMode==='audit'?'Comparando y ajustando…':'Contabilizando inventario inicial…');
+    try{await api('createOperation',payload);state.inventoryCaptureLines=[];state.data=await api('bootstrap');toast(state.inventoryCaptureMode==='audit'?'Auditoría registrada y diferencias ajustadas.':'Inventario inicial contabilizado.');renderStocktake();}catch(error){toast(error.message,true);}finally{setLoading(false);}
+  }
+
   function renderCounts() {
     const rows = filterRows(state.data.counts, ['id', 'warehouse', 'scope', 'owner', 'variance', 'status']);
-    $('#view').innerHTML = sectionHeader('Conteos y diferencias', 'Programa conteos cíclicos, solicita reconteo y contabiliza ajustes únicamente con aprobación.', 'Programar conteo', 'count', true) + `
-      <section class="card">${table(['Conteo','Almacén','Alcance','Programado','Responsable','Diferencia','Estado'], rows.map(x => [folio(x.id), x.warehouse, x.scope, x.planned, x.owner, x.variance, badge(x.status)]), 'No hay conteos con ese criterio.')}</section>`;
+    const schedules=state.data.auditSchedules||[];const auditedLines=state.data.inventoryAuditDetails||[];const differences=auditedLines.filter(row=>Math.abs(Number(row.difference))>0.000001);const reliableLines=auditedLines.length-differences.length;const reliability=auditedLines.length?Math.round((reliableLines/auditedLines.length)*10000)/100:0;
+    $('#view').innerHTML = `<div class="section-head"><div><h2>Auditorías de inventario</h2><p class="muted">Programa días especiales de conteo, mide confiabilidad y documenta cada diferencia.</p></div><div class="actions"><button class="btn ghost" data-audit-report>Descargar reporte de diferencias</button><button class="btn primary" data-open-operation="auditSchedule">Programar auditorías</button></div></div>
+      <div class="metric-grid">${metric('Confiabilidad',`${n(reliability)}%`,'✓',auditedLines.length?'Partidas sin diferencia':'Sin partidas auditadas',reliability<95&&auditedLines.length?'danger':'')}${metric('Programas activos',n(schedules.length),'◷','Días y horarios definidos')}${metric('Auditorías realizadas',n(rows.length),'▦','Historial conservado')}${metric('Diferencias encontradas',n(differences.length),'!',`${n(reliableLines)} de ${n(auditedLines.length)} partidas coinciden`,differences.length?'danger':'')}</div>
+      <section class="card"><div class="card-head"><div><h3>Calendario semanal</h3><p>Programas de conteo por almacén y alcance.</p></div></div>${table(['Programa','Almacén','Días','Hora','Tipo','Alcance'],schedules.map(x=>[x.name,x.warehouse,weekdayLabels(x.weekdays),x.startTime,countTypeLabel(x.countType),x.scope]),'No hay auditorías programadas.')}</section>
+      <section class="card page-gap"><div class="card-head"><div><h3>Diferencias recientes</h3><p>Sistema contra conteo físico, con responsable y observaciones.</p></div></div>${table(['Auditoría','Producto o material','Almacén y ubicación','Lote','Sistema','Conteo físico','Diferencia','Observaciones'],differences.slice(0,100).map(x=>[folio(x.countNumber),cell(x.item,`Código: ${x.sku}`),cell(x.warehouse,x.location),x.lot,`${n(x.systemQuantity)} ${x.uom}`,`${n(x.countedQuantity)} ${x.uom}`,delta(x.difference,x.uom),cell(x.observations,x.countedBy)]),'No se encontraron diferencias.')}</section>
+      <section class="card page-gap"><div class="card-head"><div><h3>Historial de auditorías</h3><p>La captura se realiza desde Levantamiento de inventario.</p></div></div>${table(['Conteo','Almacén','Tipo','Fecha','Responsable','Resultado','Estado'], rows.map(x => [folio(x.id), x.warehouse, countTypeLabel(x.scope), x.planned, x.owner, x.variance, badge(x.status)]), 'No hay conteos con ese criterio.')}</section>`;
   }
 
   function renderMaintenance() {
-    const rows = filterRows(state.data.maintenance, ['id', 'order', 'asset', 'item', 'reservation', 'status']);
-    $('#view').innerHTML = sectionHeader('Requisiciones de Mantenimiento', 'Las solicitudes de refacciones generan reservas y salidas de inventario ligadas a la orden de trabajo.', 'Nueva requisición', 'movement', true) + `
-      <section class="card">${table(['Requisición','Orden','Equipo','Refacción','Cantidad','Necesaria','Reserva','Estado'], rows.map(x => [folio(x.id), folio(x.order), x.asset, x.item, x.qty, x.needed, badge(x.reservation), badge(x.status)]), 'No hay requisiciones con ese criterio.')}</section>`;
+    const rows = filterRows(state.data.maintenance, ['requestNumber', 'title', 'description', 'asset', 'location', 'technicians', 'status']);
+    const canLead=state.data.user.isSuperAdmin||(state.data.user.areaCode==='MANTENIMIENTO'&&state.data.user.canManageArea);
+    $('#view').innerHTML = `<div class="section-head"><div><h2>Solicitudes y tareas de Mantenimiento</h2><p class="muted">Asigna varios técnicos, registra horas, observaciones y evidencia fotográfica.</p></div><div class="actions">${canLead?'<button class="btn ghost" data-open-operation="technician">Registrar técnico</button>':''}<button class="btn primary" data-open-operation="maintenanceRequest">Nueva solicitud</button></div></div>
+      <section class="card">${table(['Solicitud','Trabajo','Equipo y ubicación','Prioridad','Fecha requerida','Técnicos','Horas','Evidencias','Estado','Acciones'], rows.map(x => [folio(x.requestNumber),cell(x.title,x.description),cell(x.asset,x.location||''),priorityLabel(x.priority),x.needed,x.technicians,`${n(x.actualHours)} de ${n(x.estimatedHours)} horas`,`${n(x.evidenceCount)} fotografía(s)`,badge(x.status),trusted(`<div class="row-actions"><button class="btn ghost small" data-maintenance-detail="${x.id}">Ver detalle</button>${canLead?`<button class="btn ghost small" data-maintenance-assign="${x.id}">Asignar</button>`:''}${canLead||Number(x.canRespond)===1?`<button class="btn ghost small" data-maintenance-update="${x.id}">Responder</button>`:''}</div>`)]), 'No hay solicitudes de Mantenimiento.')}</section>`;
+    $$('[data-maintenance-detail]').forEach(button=>button.addEventListener('click',()=>openMaintenanceDetail(Number(button.dataset.maintenanceDetail))));
+    $$('[data-maintenance-assign]').forEach(button=>button.addEventListener('click',()=>openOperation('maintenanceAssignment',{requestId:Number(button.dataset.maintenanceAssign)})));
+    $$('[data-maintenance-update]').forEach(button=>button.addEventListener('click',()=>openOperation('maintenanceUpdate',{requestId:Number(button.dataset.maintenanceUpdate)})));
   }
+
+  function openMaintenanceDetail(requestId) {
+    const request=(state.data.maintenance||[]).find(row=>Number(row.id)===requestId);if(!request)return toast('No se encontró la solicitud.',true);
+    const updates=(state.data.maintenanceUpdates||[]).filter(row=>Number(row.requestId)===requestId);
+    const evidence=(state.data.maintenanceEvidence||[]).filter(row=>Number(row.requestId)===requestId);
+    revokeEvidenceUrls();
+    $('#detail-content').innerHTML=`<div class="dialog-head"><div><p class="eyebrow">${h(request.requestNumber)}</p><h2>${h(request.title)}</h2></div><button type="button" class="icon-btn" data-close-detail aria-label="Cerrar">×</button></div>
+      <p>${h(request.description)}</p><div class="detail-grid"><div class="detail"><small>Área solicitante</small><strong>${h(request.requestingArea)}</strong></div><div class="detail"><small>Equipo</small><strong>${h(request.asset)}</strong></div><div class="detail"><small>Ubicación</small><strong>${h(request.location||'Sin ubicación')}</strong></div><div class="detail"><small>Fecha requerida</small><strong>${h(request.needed)}</strong></div><div class="detail"><small>Prioridad</small><strong>${h(priorityLabel(request.priority))}</strong></div><div class="detail"><small>Estado</small><strong>${h(statusLabel(request.status))}</strong></div><div class="detail span-2"><small>Técnicos asignados</small><strong>${h(request.technicians)}</strong></div><div class="detail span-2"><small>Materiales o refacciones</small><strong>${h(request.materials||'No indicados')}</strong></div></div>
+      <hr class="divider"><h3>Bitácora de intervenciones</h3><div class="maintenance-timeline">${updates.map(update=>`<article><div><strong>${h(update.user)}</strong><span>${h(update.createdAt)} · ${h(statusLabel(update.status))} · ${n(update.hours)} horas</span></div><p>${h(update.observations)}</p></article>`).join('')||'<p class="muted">Todavía no hay intervenciones registradas.</p>'}</div>
+      <hr class="divider"><h3>Evidencia fotográfica</h3><div class="evidence-grid">${evidence.map(file=>`<figure><div class="evidence-preview"><span>Cargando fotografía…</span><img data-evidence-image="${h(file.id)}" alt="${h(file.fileName)}"></div><figcaption><strong>${h(file.fileName)}</strong><small>${h(file.uploadedBy)} · ${h(file.uploadedAt)}</small></figcaption></figure>`).join('')||'<p class="muted">Todavía no hay evidencia fotográfica.</p>'}</div>`;
+    $('#detail-content [data-close-detail]').addEventListener('click',()=>$('#detail-dialog').close());
+    $('#detail-dialog').showModal();
+    evidence.forEach(loadMaintenanceEvidence);
+  }
+
+  async function loadMaintenanceEvidence(file) {
+    const imageElement=$(`[data-evidence-image="${CSS.escape(String(file.id))}"]`);if(!imageElement)return;
+    try{const response=await fetch(`${API_URL}?action=maintenanceEvidence&id=${encodeURIComponent(file.id)}`,{headers:{Authorization:`Bearer ${state.token}`},cache:'no-store'});if(!response.ok)throw new Error('No se pudo abrir');const url=URL.createObjectURL(await response.blob());state.evidenceUrls.push(url);imageElement.src=url;imageElement.previousElementSibling?.remove();imageElement.addEventListener('click',()=>window.open(url,'_blank','noopener'));}catch{imageElement.previousElementSibling.textContent='No fue posible cargar esta fotografía.';}
+  }
+
+  function revokeEvidenceUrls(){for(const url of state.evidenceUrls)URL.revokeObjectURL(url);state.evidenceUrls=[];}
 
   function renderCatalogs() {
     const catalogs = [
-      ['▦','Productos y materiales','SKU, tipo, unidad, control por lote, mínimos y tiempos de entrega.','item'],
-      ['⌂','Almacenes','Materia prima, empaque, refacciones, proceso, PT y cuarentena.','warehouse'],
-      ['⌖','Ubicaciones','Recibo, cuarentena, racks, surtido, producción y devoluciones.','location'],
-      ['◇','Proveedores','Información de Compras e iniciales únicas para el pre-lote.','supplier'],
-      ['⌁','Orígenes de proveedor','Huertas, municipios y lugares de recolección.','origin'],
-      ['♙','Clientes','Datos comerciales necesarios para pedidos, Forecast y devoluciones.','customer'],
-      ['▤','Listas de materiales','Versiones de BOM, cantidades por producto, merma y rendimiento esperado.',null],
-      ['▦','Beans y retornables','Disponibilidad, asignación, ubicación, limpieza y mantenimiento.',null],
-      ['✓','Especificaciones de Calidad','Parámetros, límites, vigencias y métodos de prueba.',null],
-      ['⇧','Transportes','Unidades, capacidades y disponibilidad para Logística.',null],
-      ['⚙','Equipos de Mantenimiento','Activos sincronizados con la aplicación de Mantenimiento.',null]
+      ['●','Materias primas y aceites','Aguacate en fruta, aceite crudo para refinar y aceite listo para envasar.','itemRaw',['ALMACEN']],
+      ['▦','Materiales de empaque','Botellas, tapas, etiquetas, cajas y otros materiales de envasado.','itemPackaging',['ALMACEN']],
+      ['⚙','Refacciones','Partes y refacciones requeridas por Mantenimiento y operación.','itemSpare',['ALMACEN']],
+      ['✓','Producto terminado','Productos envasados con el código exacto que se utiliza en el Forecast.','itemFinished',['ALMACEN']],
+      ['⌂','Almacenes','Materia prima, materiales de empaque, refacciones, proceso y producto terminado.','warehouse',['ALMACEN']],
+      ['⌖','Ubicaciones','Recibo, cuarentena, almacenamiento, surtido, producción y devoluciones.','location',['ALMACEN']],
+      ['◇','Proveedores','Información de Compras e iniciales únicas para el pre-lote.','supplier',['COMPRAS']],
+      ['⌁','Orígenes de proveedor','Huertas, municipios y lugares de recolección.','origin',['COMPRAS']],
+      ['♙','Clientes','Datos comerciales necesarios para pedidos, Forecast y devoluciones.','customer',['VENTAS']],
+      ['▤','Listas de materiales','Agrega botellas, tapas, etiquetas, cajas, aceites y demás componentes por cada producto terminado.','bom',['PLANEACION','PRODUCCION','ALMACEN']],
+      ['▦','Contenedores de fruta y retornables','Disponibilidad, asignación, ubicación, limpieza y mantenimiento.',null,['ALMACEN','LOGISTICA']],
+      ['✓','Especificaciones de Calidad','Parámetros, límites, vigencias y métodos de prueba.',null,['CALIDAD']],
+      ['⇧','Transportes','Unidades, capacidades y disponibilidad para Logística.',null,['LOGISTICA','COMPRAS']],
+      ['⚙','Equipos de Mantenimiento','Máquinas y equipos vinculados con sus solicitudes.',null,['MANTENIMIENTO']],
+      ['♙','Técnicos de Mantenimiento','Personas autorizadas para recibir y responder tareas.','technician',['MANTENIMIENTO']]
     ];
-    $('#view').innerHTML = `<div class="section-head"><div><h2>Catálogos por responsable</h2><p class="muted">Cada área mantiene únicamente los datos maestros que tiene autorizados.</p></div></div><div class="catalog-grid">${catalogs.map(([icon,title,copy,operation]) => `<article class="card catalog-card"><div class="card-icon">${icon}</div><div><h3>${h(title)}</h3><p>${h(copy)}</p></div>${operation ? `<button class="btn ghost small" data-open-operation="${operation}">Crear registro</button>` : '<span class="badge info">Siguiente etapa</span>'}</article>`).join('')}</div>`;
+    const visible=state.data.user.isSuperAdmin?catalogs:catalogs.filter(item=>item[4].includes(state.data.user.areaCode));
+    $('#view').innerHTML = `<div class="section-head"><div><h2>Catálogos de ${h(state.data.user.areaName)}</h2><p class="muted">Aquí aparecen únicamente los registros que corresponden a tu área.</p></div></div><div class="catalog-grid">${visible.map(([icon,title,copy,operation]) => `<article class="card catalog-card"><div class="card-icon">${icon}</div><div><h3>${h(title)}</h3><p>${h(copy)}</p></div>${operation ? `<button class="btn ghost small" data-open-operation="${operation}">Crear registro</button>` : '<span class="badge info">Siguiente etapa</span>'}</article>`).join('')||'<section class="card card-pad"><p>No hay catálogos asignados a esta área.</p></section>'}</div>${catalogRecordsMarkup()}`;
+  }
+
+  function catalogRecordsMarkup() {
+    const lookups=state.data.lookups||{};const area=state.data.user.areaCode;const records=[];
+    if(state.data.user.isSuperAdmin||area==='ALMACEN'){
+      for(const item of lookups.items||[])records.push({catalog:'Producto o material',name:item.name,code:item.sku,detail:`${itemTypeLabel(item.item_type)} · ${unitLabel(item.uom_code)}`});
+      for(const warehouse of lookups.warehouses||[])records.push({catalog:'Almacén',name:warehouse.name,code:warehouse.code,detail:warehouseTypeLabel(warehouse.warehouse_type)});
+      for(const location of lookups.locations||[])records.push({catalog:'Ubicación',name:location.name,code:location.code,detail:location.warehouse_name});
+    }
+    if(state.data.user.isSuperAdmin||area==='COMPRAS')for(const supplier of lookups.suppliers||[])records.push({catalog:'Proveedor',name:supplier.name,code:supplier.supplier_code,detail:'Compras y abastecimiento'});
+    if(state.data.user.isSuperAdmin||area==='VENTAS')for(const customer of lookups.customers||[])records.push({catalog:'Cliente',name:customer.name,code:customer.customer_code,detail:'Ventas y devoluciones'});
+    if(state.data.user.isSuperAdmin||area==='MANTENIMIENTO'){
+      for(const asset of lookups.assets||[])records.push({catalog:'Equipo',name:asset.asset_name,code:asset.asset_code,detail:'Mantenimiento'});
+      for(const technician of lookups.technicians||[])records.push({catalog:'Técnico',name:technician.name,code:technician.email,detail:technician.specialties||'Sin especialidad indicada'});
+    }
+    const filtered=filterRows(records,['catalog','name','code','detail']).slice(0,200);
+    return `<section class="card page-gap"><div class="card-head"><div><h3>Registros activos</h3><p>Los registros marcados como [EJEMPLO] sirven como guía y no tienen existencias ficticias.</p></div></div>${table(['Catálogo','Nombre','Código','Detalle'],filtered.map(row=>[row.catalog,cell(row.name,row.detail),folio(row.code),row.name.startsWith('[EJEMPLO]')?badge('Ejemplo'):'Activo']),'Todavía no hay registros activos en los catálogos de tu área.')}</section>`;
   }
 
   function renderUsers() {
     const rows = filterRows(state.data.users, ['name', 'email', 'area', 'role', 'modules', 'status']);
-    $('#view').innerHTML = sectionHeader('Usuarios, roles y módulos', 'Solo el superadministrador puede crear usuarios y definir sus accesos.', 'Nuevo usuario', 'user', true) + `
+    const adminActions=state.data.user.isSuperAdmin?'<button class="btn ghost" data-open-operation="area">Nueva área</button><button class="btn ghost" data-open-operation="role">Nuevo rol</button>':'';
+    $('#view').innerHTML = `<div class="section-head"><div><h2>Usuarios y accesos</h2><p class="muted">El administrador del sistema gestiona todas las áreas; cada jefe administra únicamente a su propio equipo.</p></div><div class="actions">${adminActions}<button class="btn primary" data-open-operation="user">Nuevo usuario</button></div></div>` + `
       <section class="card">${table(['Usuario','Área','Rol','Módulos','Estado',''], rows.map(x => [cell(x.name, x.email), x.area, x.role, x.modules, badge(x.status), trusted('<button class="btn ghost small" data-user-edit>Configurar</button>')]), 'No hay usuarios con ese criterio.')}</section>
-      <section class="card card-pad page-gap"><h3>Ejemplo de permisos por módulo</h3><p>Los permisos efectivos combinan el rol y las excepciones asignadas al usuario.</p><div class="permission-matrix"><div class="matrix-head">Módulo</div><div class="matrix-head">Ver</div><div class="matrix-head">Crear</div><div class="matrix-head">Aprobar</div><div class="matrix-head">Admin.</div>${['Inventarios','Recepciones','Calidad','Forecast','Usuarios'].map((name, i) => `<div>${name}</div><div class="matrix-value">✓</div><div class="matrix-value">${i === 4 ? '—' : '✓'}</div><div class="matrix-value">${[2,3].includes(i) ? '✓' : '—'}</div><div class="matrix-value">${i === 4 ? '✓' : '—'}</div>`).join('')}</div></section>`;
+      <section class="card card-pad page-gap"><h3>Separación por área</h3><p>Las casillas seleccionadas determinan las ventanas visibles. Un jefe de área no puede consultar ni asignar módulos que no le pertenecen.</p></section>`;
   }
 
   function renderAudit() {
@@ -532,11 +695,11 @@
   }
 
   function inventoryTable(rows) {
-    return table(['SKU / material','Tipo','Almacén','Lote','Existencia','Reservado','Disponible','Estado'], rows.map(x => [cell(x.sku, x.item), x.type, x.warehouse, folio(x.lot), numCell(x.onHand, '', x.uom), numCell(x.reserved, '', x.uom), numCell(x.available, x.available <= 0 ? 'negative' : 'positive', x.uom), badge(x.status)]), 'No hay existencias con ese criterio.');
+    return table(['Producto o material','Tipo','Almacén','Lote','Existencia','Reservado','Disponible','Estado'], rows.map(x => [cell(x.item, `Código: ${x.sku}`), itemTypeLabel(x.type), x.warehouse, folio(x.lot), numCell(x.onHand, '', unitLabel(x.uom)), numCell(x.reserved, '', unitLabel(x.uom)), numCell(x.available, x.available <= 0 ? 'negative' : 'positive', unitLabel(x.uom)), badge(x.status)]), 'No hay existencias con ese criterio.');
   }
 
   function movementTable(rows, compact = false) {
-    return table(['Movimiento','Fecha','Tipo','SKU / lote','Cantidad','Ubicación','Usuario','Estado'], rows.map(x => [folio(x.id), x.date, x.type, cell(x.sku, x.lot), delta(x.qty, x.uom), x.location, x.user, badge(x.status)]), 'No hay movimientos con ese criterio.', compact ? 'compact' : '');
+    return table(['Movimiento','Fecha','Tipo','Producto o lote','Cantidad','Ubicación','Usuario','Estado'], rows.map(x => [folio(x.id), x.date, movementTypeLabel(x.type), cell(x.item||x.sku, x.item?`Código: ${x.sku} · Lote: ${x.lot}`:x.lot), delta(x.qty, unitLabel(x.uom)), x.location, x.user, badge(x.status)]), 'No hay movimientos con ese criterio.', compact ? 'compact' : '');
   }
 
   function table(headers, rows, emptyText, extraClass = '') {
@@ -551,7 +714,7 @@
   function folio(value) { return trusted(`<span class="folio">${h(value)}</span>`); }
   function numCell(value, className = '', uom = '') { return trusted(`<span class="${className}">${n(value)}${uom ? ` ${h(uom)}` : ''}</span>`); }
   function delta(value, uom = '') { const number = Number(value); return trusted(`<span class="${number > 0 ? 'positive' : number < 0 ? 'negative' : ''}">${number > 0 ? '+' : ''}${n(number)}${uom ? ` ${h(uom)}` : ''}</span>`); }
-  function badge(value) { const slug = String(value).toLowerCase(); let tone = 'info'; if (/aprob|confirm|complet|termin|cerrad|listo|cubiert|activo|disponible|contabilizado|entregada/.test(slug)) tone = 'good'; if (/pend|solicit|parcial|condicional|reconteo|por confirmar|por surtir|bajo/.test(slug)) tone = 'warning'; if (/rechaz|faltante|riesgo|crítico|sin disponible|retras|vencid|por devolver/.test(slug)) tone = 'danger'; return trusted(`<span class="badge ${tone}">${h(value)}</span>`); }
+  function badge(value) { const label=statusLabel(value);const slug=label.toLowerCase(); let tone = 'info'; if (/aprob|confirm|complet|termin|cerrad|listo|cubiert|activo|disponible|contabilizado|entregada|liberado|verificado/.test(slug)) tone = 'good'; if (/pend|solicit|parcial|condicional|reconteo|por confirmar|por surtir|bajo|proceso|asignado|planeado/.test(slug)) tone = 'warning'; if (/rechaz|faltante|riesgo|crítico|sin existencia|retras|vencid|por devolver|cancelado/.test(slug)) tone = 'danger'; return trusted(`<span class="badge ${tone}">${h(label)}</span>`); }
   function coverage(items) { return `<div class="progress-list">${items.map(item => `<div class="progress-row"><div class="progress-label"><span>${h(item.name)}</span><strong>${n(item.value)}%</strong></div><div class="track"><div class="bar ${item.tone === 'red' ? 'red' : item.tone === 'amber' ? 'amber' : ''}" style="width:${Math.max(0, Math.min(100, item.value))}%"></div></div></div>`).join('')}</div>`; }
   function agenda(items) { return `<div class="agenda">${items.map(item => `<div class="agenda-item"><div class="agenda-time">${h(item.time)}</div><div class="agenda-rail"><span class="agenda-dot"></span></div><div class="agenda-copy"><strong>${h(item.supplier)}</strong><span>${h(item.material)} · ${h(item.dock)}</span></div></div>`).join('')}</div>`; }
   function alertRows(items) { return `<div class="alert-stack">${items.map(item => `<article class="alert-row ${item.severity}"><h4>${h(item.title)}</h4><p>${h(item.message)}</p><time>${h(item.time)}</time></article>`).join('')}</div>`; }
@@ -567,39 +730,142 @@
     $$('[data-open-operation]').forEach(button => button.addEventListener('click', () => openOperation(button.dataset.openOperation)));
     $$('[data-open-alerts]').forEach(button => button.addEventListener('click', openAlerts));
     $$('[data-export]').forEach(button => button.addEventListener('click', exportCurrentPage));
+    $$('[data-executive-report]').forEach(button => button.addEventListener('click', exportExecutiveReport));
+    $$('[data-audit-report]').forEach(button => button.addEventListener('click', exportInventoryAuditReport));
     $$('[data-user-edit]').forEach(button => button.addEventListener('click', () => toast('Para cambiar accesos, cree una nueva asignación desde el administrador.')));
   }
 
-  function openOperation(type) {
-    if (typeof type === 'string' && operationFields[type]) $('#operation-type').value = type;
-    renderOperationFields();
-    $('#operation-dialog').showModal();
+  function openOperation(type, context = {}) {
+    if (!type || !OPERATION_META[type]) return toast('Esta ventana no tiene una captura rápida configurada.', true);
+    const form=$('#operation-form');form.reset();state.operationContext=context;state.forecastPreview=null;state.forecastFile=null;
+    $('#operation-type').value=type;const meta=OPERATION_META[type];$('#operation-kicker').textContent=meta[0];$('#operation-title').textContent=meta[1];
+    renderOperationFields();$('#operation-dialog').showModal();
   }
 
-  function renderOperationFields() { $('#operation-fields').innerHTML = operationFields[$('#operation-type').value] || operationFields.appointment; }
+  function renderOperationFields() {
+    const type=$('#operation-type').value;const lookups=state.data?.lookups||{};let markup=operationFields[type]||'';
+    if(type==='user') markup=userFields(lookups);
+    if(['item','itemRaw','itemPackaging','itemSpare','itemFinished'].includes(type)) markup=itemFields(lookups,type);
+    if(type==='role') markup=roleFields(lookups);
+    if(type==='bom') markup=bomFields(lookups);
+    if(type==='technician') markup=technicianFields();
+    if(type==='maintenanceRequest') markup=maintenanceRequestFields(lookups);
+    if(type==='maintenanceAssignment') markup=maintenanceAssignmentFields(lookups,state.operationContext?.requestId);
+    if(type==='maintenanceUpdate') markup=maintenanceUpdateFields(lookups,state.operationContext?.requestId);
+    if(type==='forecastImport') markup=forecastImportFields();
+    if(type==='auditSchedule') markup=auditScheduleFields(lookups);
+    $('#operation-fields').innerHTML=markup;
+    if(type==='forecastImport') $('#forecast-file')?.addEventListener('change',analyzeForecastFile);
+  }
+
+  function userFields(lookups) {
+    return `<label>Nombre completo<input name="display_name" required maxlength="160"></label><label>Correo electrónico<input name="email" type="email" required maxlength="190"></label>
+      <label>Área<select name="area_id" required><option value="">Selecciona el área</option>${(lookups.areas||[]).map(x=>`<option value="${h(x.id)}">${h(x.name)}</option>`).join('')}</select></label>
+      <label>Rol<select name="role_code" required><option value="">Selecciona el rol</option>${(lookups.roles||[]).map(x=>`<option value="${h(x.code)}">${h(x.name)}</option>`).join('')}</select></label>
+      <fieldset class="span-2 check-field"><legend>Ventanas y módulos autorizados</legend><p>Marca únicamente las ventanas que esta persona debe utilizar.</p><div class="check-grid">${moduleChecks(lookups.modules||[])}</div></fieldset>
+      <label class="span-2">Contraseña inicial segura<input name="password" type="password" minlength="12" autocomplete="new-password" required></label>`;
+  }
+
+  function itemFields(lookups, variant='item') {
+    const typeField={itemRaw:'<label>Tipo de materia prima<select name="item_type" required><option value="RAW_FRUIT">Aguacate en fruta</option><option value="BULK_OIL">Aceite crudo, para refinar o listo para envasar</option><option value="RAW_OTHER">Otra materia prima</option></select></label>',itemPackaging:'<input name="item_type" type="hidden" value="PACKAGING">',itemSpare:'<input name="item_type" type="hidden" value="SPARE_PART">',itemFinished:'<input name="item_type" type="hidden" value="FINISHED_GOOD">'}[variant]||'<label>Tipo<select name="item_type" required><option value="RAW_FRUIT">Aguacate en fruta</option><option value="BULK_OIL">Aceite crudo, para refinar o listo para envasar</option><option value="RAW_OTHER">Otra materia prima</option><option value="PACKAGING">Material de empaque</option><option value="SPARE_PART">Refacción</option><option value="CONSUMABLE">Consumible</option><option value="FINISHED_GOOD">Producto terminado</option></select></label>';
+    const example=variant==='itemFinished'?'Código exacto usado en el Forecast':variant==='itemPackaging'?'Ej. Botella de vidrio de 500 mililitros':'Código interno único';
+    return `<label>Código del producto o material<input name="sku" required maxlength="80" placeholder="${example}"></label><label>Nombre completo<input name="item_name" required maxlength="190"></label>${typeField}<label>Categoría<select name="category_code" required><option value="">Selecciona la categoría</option>${(lookups.categories||[]).map(x=>`<option value="${h(x.code)}">${h(x.name)}</option>`).join('')}</select></label><label>Unidad base<select name="uom_code" required><option value="">Selecciona la unidad</option>${(lookups.units||[]).map(x=>`<option value="${h(x.code)}">${h(x.name)}</option>`).join('')}</select></label><label>Punto de reorden<input name="reorder_point" type="number" min="0" step="0.001" value="0"></label><label>Control por lote<select name="lot_controlled"><option value="1">Sí</option><option value="0">No</option></select></label><label>Requiere liberación de Calidad<select name="quality_required"><option value="1">Sí</option><option value="0">No</option></select></label>`;
+  }
+
+  function roleFields(lookups) {
+    return `<label>Nombre del rol<input name="role_name" maxlength="100" required placeholder="Ej. Coordinador de producto terminado"></label><label>Nivel de responsabilidad<select name="permission_profile" required><option value="VIEWER">Solo consulta</option><option value="OPERATOR">Captura y movimientos</option><option value="APPROVER">Aprobación y rechazo</option><option value="MANAGER">Jefatura completa</option></select></label><label class="span-2">Descripción<input name="description" maxlength="255"></label><fieldset class="span-2 check-field"><legend>Módulos incluidos en el rol</legend><div class="check-grid">${moduleChecks(lookups.modules||[])}</div></fieldset>`;
+  }
+
+  function bomFields(lookups) {
+    const components=(lookups.items||[]).filter(item=>!['FINISHED_GOOD','SERVICE'].includes(item.item_type));
+    return `<label class="span-2">Producto terminado<select name="finished_item_id" required><option value="">Selecciona el producto</option>${(lookups.finishedGoods||[]).map(item=>`<option value="${h(item.id)}">${h(item.name)} · ${h(item.sku)}</option>`).join('')}</select></label><label>Cantidad de producto terminado<input name="output_quantity" type="number" min="0.000001" step="0.000001" value="1" required><small>Base para expresar el consumo.</small></label><label>Material o materia prima<select name="component_item_id" required><option value="">Selecciona el componente</option>${components.map(item=>`<option value="${h(item.id)}">${h(item.name)} · ${h(item.sku)}</option>`).join('')}</select></label><label>Cantidad necesaria del componente<input name="component_quantity" type="number" min="0.000001" step="0.000001" required></label><label>Merma esperada en porcentaje<input name="scrap_percent" type="number" min="0" max="100" step="0.01" value="0" required></label><p class="span-2 muted">Guarda una vez por cada componente. Si ya existe, su cantidad se actualizará.</p>`;
+  }
+
+  function moduleChecks(modules) { return modules.map(x=>`<label class="check-card"><input type="checkbox" name="module_codes" value="${h(x.code)}"><span>✓</span><strong>${h(x.name)}</strong></label>`).join(''); }
+
+  function technicianFields() {
+    return `<label>Nombre completo<input name="display_name" required maxlength="160"></label><label>Correo electrónico<input name="email" type="email" required maxlength="190"></label><label>Especialidades<input name="specialties" maxlength="500" placeholder="Ej. Electricidad, mecánica, refrigeración"></label><label>Teléfono<input name="phone" maxlength="40"></label><label class="span-2">Contraseña inicial segura<input name="password" type="password" minlength="12" required autocomplete="new-password"></label>`;
+  }
+
+  function maintenanceRequestFields(lookups) {
+    return `<label class="span-2">Trabajo solicitado<input name="title" maxlength="190" required placeholder="Ej. Revisar fuga en llenadora"></label><label class="span-2">Descripción completa<textarea name="description" rows="4" maxlength="3000" required></textarea></label><label>Área solicitante<select name="area_id"><option value="">Mi área</option>${(lookups.areas||[]).map(x=>`<option value="${h(x.id)}">${h(x.name)}</option>`).join('')}</select></label><label>Equipo<select name="asset_id"><option value="">Sin equipo asociado</option>${(lookups.assets||[]).map(x=>`<option value="${h(x.id)}">${h(x.asset_name)}</option>`).join('')}</select></label><label>Ubicación<input name="location_description" maxlength="255"></label><label>Prioridad<select name="priority_code"><option value="LOW">Baja</option><option value="NORMAL" selected>Normal</option><option value="HIGH">Alta</option><option value="CRITICAL">Crítica</option></select></label><label>Fecha y hora requerida<input name="needed_at" type="datetime-local" required></label><label>Materiales o refacciones requeridos<textarea name="requested_materials" rows="3" maxlength="2000"></textarea></label>`;
+  }
+
+  function maintenanceAssignmentFields(lookups, requestId) {
+    return `<label class="span-2">Solicitud<select name="request_id" required><option value="">Selecciona la solicitud</option>${(lookups.maintenanceRequests||[]).map(x=>`<option value="${h(x.id)}" ${String(x.id)===String(requestId)?'selected':''}>${h(x.request_number)} · ${h(x.title)}</option>`).join('')}</select></label><fieldset class="span-2 check-field"><legend>Técnicos y horas estimadas</legend><p>Puedes asignar más de una persona y definir el tiempo de cada intervención.</p><div class="technician-grid">${(lookups.technicians||[]).map(x=>`<label class="technician-option"><input type="checkbox" name="technician_user_ids" value="${h(x.id)}"><span><strong>${h(x.name)}</strong><small>${h(x.specialties||'Sin especialidad registrada')}</small></span><input type="number" name="hours_${h(x.id)}" min="0.25" max="999" step="0.25" value="1" aria-label="Horas estimadas para ${h(x.name)}"></label>`).join('')||'<p>No hay técnicos activos. Registra primero un técnico.</p>'}</div></fieldset>`;
+  }
+
+  function maintenanceUpdateFields(lookups, requestId) {
+    return `<label class="span-2">Solicitud<select name="request_id" required><option value="">Selecciona la solicitud</option>${(lookups.maintenanceRequests||[]).map(x=>`<option value="${h(x.id)}" ${String(x.id)===String(requestId)?'selected':''}>${h(x.request_number)} · ${h(x.title)}</option>`).join('')}</select></label><label>Resultado<select name="work_status" required><option value="IN_PROGRESS">Trabajo en proceso</option><option value="WAITING_PARTS">Esperando materiales o refacciones</option><option value="COMPLETED">Intervención terminada</option>${state.data?.user?.canManageArea?'<option value="VERIFIED">Trabajo verificado y cerrado</option>':''}</select></label><label>Horas de esta intervención<input name="hours_reported" type="number" min="0" max="999" step="0.25" value="0" required></label><label class="span-2">Observaciones y trabajo realizado<textarea name="observations" rows="4" maxlength="3000" required></textarea></label><label class="span-2">Evidencia fotográfica<input name="evidence_files" type="file" accept="image/jpeg,image/png,image/webp" multiple><small>Hasta 5 MB por fotografía. Puedes seleccionar varias.</small></label>`;
+  }
+
+  function forecastImportFields() {
+    return `<label class="span-2">Archivo de Excel<input id="forecast-file" name="forecast_file" type="file" accept=".xlsx,.xls,.csv" required><small>El sistema busca automáticamente el código de producto terminado y los meses.</small></label><label>Año del plan<input name="fiscal_year" type="number" min="2020" max="2100" value="${new Date().getFullYear()}" required></label><label>Nombre de la versión<input name="version_name" maxlength="120" required placeholder="Ej. Revisión de septiembre"></label><label class="span-2">Motivo del cambio<textarea name="change_reason" rows="3" maxlength="1000" required placeholder="Explica qué cambió respecto al plan anterior"></textarea></label><div id="forecast-preview" class="span-2 import-preview"><strong>Selecciona el archivo</strong><span>Se analizará en tu navegador antes de guardarlo.</span></div>`;
+  }
+
+  function auditScheduleFields(lookups) {
+    const days=[['MON','Lunes'],['TUE','Martes'],['WED','Miércoles'],['THU','Jueves'],['FRI','Viernes'],['SAT','Sábado'],['SUN','Domingo']];
+    return `<label class="span-2">Nombre del programa<input name="schedule_name" maxlength="160" required placeholder="Ej. Conteo de materiales críticos"></label><label>Almacén<select name="warehouse_id" required><option value="">Selecciona un almacén</option>${(lookups.warehouses||[]).map(x=>`<option value="${h(x.id)}">${h(x.name)}</option>`).join('')}</select></label><label>Hora de inicio<input name="start_time" type="time" value="08:00" required></label><fieldset class="span-2 check-field"><legend>Días de la semana</legend><div class="check-grid">${days.map(day=>`<label class="check-card"><input type="checkbox" name="weekday_codes" value="${day[0]}"><span>✓</span><strong>${day[1]}</strong></label>`).join('')}</div></fieldset><label>Tipo de auditoría<select name="count_type"><option value="CYCLE">Conteo cíclico</option><option value="SPOT">Conteo selectivo</option><option value="FULL">Inventario total</option><option value="QUALITY_HOLD">Producto pendiente de Calidad</option></select></label><label>Alcance<input name="scope_description" maxlength="255" required placeholder="Ej. Materiales de mayor consumo"></label><label class="span-2">Indicaciones y observaciones<textarea name="notes" rows="3" maxlength="1000"></textarea></label>`;
+  }
 
   async function submitOperation(event) {
     event.preventDefault();
     const form = event.currentTarget;
-    const payload = Object.fromEntries(new FormData(form).entries());
+    const formData=new FormData(form);const payload=formDataToObject(formData);const type=$('#operation-type').value;payload.operation_type=['itemRaw','itemPackaging','itemSpare','itemFinished'].includes(type)?'item':type;
+    if(type==='maintenanceAssignment'){
+      const ids=formData.getAll('technician_user_ids');payload.assignments=ids.map(id=>({technician_user_id:Number(id),estimated_hours:Number(formData.get(`hours_${id}`)||0)}));
+    }
+    if(type==='forecastImport'){
+      if(!state.forecastPreview?.rows?.length)return toast('Selecciona y analiza un archivo de Excel válido.',true);
+      const planYear=String(payload.fiscal_year);payload.rows=state.forecastPreview.rows.map(row=>({...row,period_start:`${planYear}-${String(row.period_start).slice(5)}`}));payload.source_file_name=state.forecastFile.name;payload.source_file_hash=state.forecastFile.hash;
+    }
+    const evidenceFiles=type==='maintenanceUpdate'?formData.getAll('evidence_files').filter(file=>file instanceof File&&file.size>0):[];
     const submit = form.querySelector('[type="submit"]');
     submit.disabled = true;
     submit.textContent = 'Guardando…';
+    let operationResult=null;
     try {
       if (state.demo) {
         await new Promise(resolve => setTimeout(resolve, 350));
       } else {
         payload.idempotency_key = crypto.randomUUID();
-        await api('createOperation', payload);
+        operationResult=await api('createOperation', payload);
+        if(type==='forecastImport'&&!operationResult.imported){
+          const missing=(operationResult.missingProductCodes||[]).join(', ');throw new Error(missing?`No coinciden estos códigos de producto terminado: ${missing}`:`Hay filas inválidas: ${(operationResult.invalidRows||[]).join(', ')}`);
+        }
+        if(type==='maintenanceUpdate'&&evidenceFiles.length){for(const file of evidenceFiles)await uploadEvidence(Number(payload.request_id),file);}
         state.data = await api('bootstrap');
       }
       form.close?.();
       $('#operation-dialog').close();
-      toast(state.demo ? 'Operación simulada; no se modificó la base de datos.' : 'Operación guardada correctamente.');
+      const missingLists=operationResult?.mrp?.missingBillsOfMaterial||[];
+      toast(state.demo?'Operación simulada; no se modificó la base de datos.':missingLists.length?`Forecast guardado. Faltan listas de materiales para ${missingLists.length} producto(s).`:'Operación guardada correctamente.');
       renderPage();
     } catch (error) { toast(error.message, true); }
     finally { submit.disabled = false; submit.textContent = submit.dataset.idleLabel; }
   }
+
+  function formDataToObject(formData) {
+    const result={};for(const [key,value] of formData.entries()){if(key==='evidence_files'||key.startsWith('hours_')||key==='technician_user_ids')continue;if(['module_codes','weekday_codes'].includes(key)){if(!Array.isArray(result[key]))result[key]=[];result[key].push(value);}else result[key]=value;}return result;
+  }
+
+  async function uploadEvidence(requestId,file) {
+    const data=new FormData();data.append('request_id',String(requestId));data.append('evidence',file);const response=await fetch(`${API_URL}?action=uploadMaintenanceEvidence`,{method:'POST',headers:{Authorization:`Bearer ${state.token}`},body:data,cache:'no-store'});const result=await response.json().catch(()=>null);if(!response.ok||!result?.ok)throw new Error(result?.error||`No se pudo guardar ${file.name}.`);return result.data;
+  }
+
+  async function analyzeForecastFile(event) {
+    const file=event.target.files?.[0];if(!file)return;const preview=$('#forecast-preview');preview.innerHTML='<strong>Analizando archivo…</strong><span>Buscando códigos y meses.</span>';
+    try{if(!window.XLSX)throw new Error('No se cargó el lector de Excel.');const bytes=await file.arrayBuffer();const hashBytes=await crypto.subtle.digest('SHA-256',bytes);const hash=Array.from(new Uint8Array(hashBytes),x=>x.toString(16).padStart(2,'0')).join('');const workbook=XLSX.read(bytes,{type:'array',cellDates:true});const parsed=parseForecastWorkbook(workbook);if(!parsed.rows.length)throw new Error('No se localizaron renglones con código de producto y cantidades mensuales.');state.forecastPreview=parsed;state.forecastFile={name:file.name,hash};preview.innerHTML=`<strong>${n(parsed.rows.length)} registros detectados</strong><span>Hoja: ${h(parsed.sheet)} · ${n(parsed.products)} productos · ${n(parsed.months)} meses. Al guardar se validarán los códigos contra Producto terminado.</span>`;}catch(error){state.forecastPreview=null;state.forecastFile=null;preview.innerHTML=`<strong>No se pudo leer el archivo</strong><span>${h(error.message)}</span>`;}
+  }
+
+  function parseForecastWorkbook(workbook) {
+    let best={rows:[],sheet:'',products:0,months:0};for(const sheetName of workbook.SheetNames){const matrix=XLSX.utils.sheet_to_json(workbook.Sheets[sheetName],{header:1,defval:'',raw:false});for(let headerIndex=0;headerIndex<Math.min(matrix.length,40);headerIndex++){const headers=(matrix[headerIndex]||[]).map(normalizeHeader);const codeIndex=headers.findIndex(x=>/^(CODIGO|CLAVE|SKU|MATERIAL)$|CODIGO.*(PRODUCTO|PT|MATERIAL)|CLAVE.*(PRODUCTO|PT)|ITEM.*CODE|PRODUCT.*CODE/.test(x)&&!/(CLIENTE|PROVEEDOR)/.test(x));if(codeIndex<0)continue;const customerIndex=headers.findIndex(x=>/(CLIENTE|CUSTOMER)/.test(x));const periodIndex=headers.findIndex(x=>/^(MES|PERIODO|FECHA)$|MES.*PLAN|PERIODO.*FORECAST/.test(x));const quantityIndex=headers.findIndex(x=>/(CANTIDAD|FORECAST|PLAN|VOLUMEN)/.test(x)&&!/(CODIGO|CLIENTE)/.test(x));const monthColumns=(matrix[headerIndex]||[]).map((header,index)=>({index,period:cellToPeriod(header)})).filter(x=>x.period&&x.index!==codeIndex);const rows=[];for(const source of matrix.slice(headerIndex+1)){const productCode=String(source[codeIndex]??'').trim();if(!productCode)continue;const customer=customerIndex>=0?String(source[customerIndex]??'').trim():'';if(periodIndex>=0&&quantityIndex>=0){const period=cellToPeriod(source[periodIndex]);const quantity=parseQuantity(source[quantityIndex]);if(period&&quantity!==null)rows.push({product_code:productCode,customer,period_start:period,quantity});}else{for(const month of monthColumns){const quantity=parseQuantity(source[month.index]);if(quantity!==null)rows.push({product_code:productCode,customer,period_start:month.period,quantity});}}}if(rows.length>best.rows.length){const products=new Set(rows.map(x=>x.product_code));const months=new Set(rows.map(x=>x.period_start));best={rows,sheet:sheetName,products:products.size,months:months.size};}}}return best;
+  }
+
+  function normalizeHeader(value){return String(value??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toUpperCase().replace(/\s+/g,' ');}
+  function monthHeaderToPeriod(value){const text=normalizeHeader(value);const names={ENE:1,ENERO:1,JAN:1,JANUARY:1,FEB:2,FEBRERO:2,FEBRUARY:2,MAR:3,MARZO:3,MARCH:3,ABR:4,ABRIL:4,APR:4,APRIL:4,MAY:5,MAYO:5,JUN:6,JUNIO:6,JUNE:6,JUL:7,JULIO:7,JULY:7,AGO:8,AGOSTO:8,AUG:8,AUGUST:8,SEP:9,SEPT:9,SEPTIEMBRE:9,SEPTEMBER:9,OCT:10,OCTUBRE:10,OCTOBER:10,NOV:11,NOVIEMBRE:11,NOVEMBER:11,DIC:12,DICIEMBRE:12,DEC:12,DECEMBER:12};let month=null;for(const [name,number] of Object.entries(names)){if(new RegExp(`(^|[^A-Z])${name}([^A-Z]|$)`).test(text)){month=number;break;}}if(!month)return null;const yearMatch=text.match(/(20\d{2})|(?:\b(\d{2})\b)/);const year=yearMatch?(yearMatch[1]?Number(yearMatch[1]):2000+Number(yearMatch[2])):new Date().getFullYear();return `${year}-${String(month).padStart(2,'0')}-01`;}
+  function cellToPeriod(value){if(value instanceof Date&&!Number.isNaN(value.valueOf()))return `${value.getFullYear()}-${String(value.getMonth()+1).padStart(2,'0')}-01`;const text=String(value??'').trim();const iso=text.match(/^(20\d{2})[-\/]([01]?\d)/);if(iso)return `${iso[1]}-${String(Number(iso[2])).padStart(2,'0')}-01`;const local=text.match(/^([0-3]?\d)[-\/]([01]?\d)[-\/](20\d{2})$/);if(local)return `${local[3]}-${String(Number(local[2])).padStart(2,'0')}-01`;const us=text.match(/^([01]?\d)[-\/]([0-3]?\d)[-\/](20\d{2})$/);if(us)return `${us[3]}-${String(Number(us[1])).padStart(2,'0')}-01`;return monthHeaderToPeriod(text);}
+  function parseQuantity(value){if(value===''||value==null)return null;const cleaned=String(value).replace(/\s/g,'').replace(/,/g,'');const number=Number(cleaned);return Number.isFinite(number)&&number>=0?number:null;}
 
   function closeDialogs() { $$('.dialog[open]').forEach(dialog => dialog.close()); }
   function toggleSidebar() { $('#sidebar').classList.toggle('open'); $('#scrim').classList.toggle('hidden', !$('#sidebar').classList.contains('open')); }
@@ -621,6 +887,7 @@
       users: state.data.users, audit: state.data.audit
     }[state.page];
     if (!source?.length) return toast('Esta vista no contiene registros exportables.', true);
+    if(window.XLSX){const workbook=XLSX.utils.book_new();const rows=state.page==='inventory'?source.map(x=>({'Producto o material':x.item,'Código del producto':x.sku,'Tipo':itemTypeLabel(x.type),'Almacén':x.warehouse,'Lote':x.lot,'Existencia':Number(x.onHand),'Reservado':Number(x.reserved),'Disponible':Number(x.available),'Unidad':unitLabel(x.uom),'Estado':x.status})):source;const sheet=XLSX.utils.json_to_sheet(rows);XLSX.utils.book_append_sheet(workbook,sheet,state.page==='inventory'?'Inventario analítico':'Reporte');XLSX.writeFile(workbook,`oleolab-${state.page}-${new Date().toISOString().slice(0,10)}.xlsx`);return toast('Reporte de Excel generado.');}
     const keys = Object.keys(source[0]);
     const csv = [keys.join(','), ...source.map(row => keys.map(key => csvValue(row[key])).join(','))].join('\r\n');
     const blob = new Blob(['\ufeff', csv], { type: 'text/csv;charset=utf-8' });
@@ -629,6 +896,24 @@
     anchor.href = url; anchor.download = `oleolab-${state.page}-${new Date().toISOString().slice(0, 10)}.csv`;
     document.body.appendChild(anchor); anchor.click(); anchor.remove(); URL.revokeObjectURL(url);
     toast('Reporte CSV generado.');
+  }
+
+  function exportExecutiveReport() {
+    const area=state.data.areaDashboard;if(!area)return toast('No hay información ejecutiva disponible.',true);if(!window.XLSX)return toast('El lector de reportes no está disponible.',true);const workbook=XLSX.utils.book_new();
+    const summary=(area.metrics||[]).map(x=>({Indicador:x.label,Resultado:Number(x.value),Descripción:x.note}));XLSX.utils.book_append_sheet(workbook,XLSX.utils.json_to_sheet(summary),'Resumen');
+    const warehouses=(area.inventoryByWarehouse||[]).map(x=>({Almacén:x.label,'Productos con existencia':Number(x.items),'Cantidad acumulada':Number(x.quantity)}));XLSX.utils.book_append_sheet(workbook,XLSX.utils.json_to_sheet(warehouses),'Existencias por almacén');
+    const critical=(area.criticalMaterials||[]).map(x=>({'Producto o material':x.item,'Código':x.sku,'Disponible':Number(x.available),'Punto de reorden':Number(x.reorder_point),'Unidad':x.uom,'Estado':x.status}));XLSX.utils.book_append_sheet(workbook,XLSX.utils.json_to_sheet(critical),'Materiales críticos');
+    const flow=(area.highFlow||[]).map(x=>({'Producto o material':x.item,'Código':x.sku,'Salida últimos 30 días':Number(x.quantity),'Unidad':x.uom}));XLSX.utils.book_append_sheet(workbook,XLSX.utils.json_to_sheet(flow),'Mayor consumo');
+    const compliance=(area.forecastCompliance||[]).map(x=>({'Producto terminado':x.item,'Código':x.sku,'Forecast vigente':Number(x.forecastQty),'Disponible':Number(x.availableQty),'Cobertura porcentual':Number(x.compliance)}));XLSX.utils.book_append_sheet(workbook,XLSX.utils.json_to_sheet(compliance),'Cumplimiento Forecast');
+    const requirements=(state.data.mrp||[]).map(x=>({'Material o materia prima':x.item,'Código':x.sku,'Necesidad bruta':Number(x.required),'Existencia':Number(x.available),'Faltante':Number(x.shortage),'Fecha requerida':x.needDate,'Acción sugerida':x.action,'Estado':statusLabel(x.status)}));XLSX.utils.book_append_sheet(workbook,XLSX.utils.json_to_sheet(requirements),'Necesidades de materiales');
+    XLSX.writeFile(workbook,`oleolab-reporte-ejecutivo-${new Date().toISOString().slice(0,10)}.xlsx`);toast('Reporte ejecutivo de Excel generado.');
+  }
+
+  function exportInventoryAuditReport() {
+    const details=state.data.inventoryAuditDetails||[];if(!details.length)return toast('Todavía no hay partidas auditadas para generar el reporte.',true);
+    const rows=details.map(x=>({'Auditoría':x.countNumber,'Fecha':x.auditDate,'Almacén':x.warehouse,'Ubicación':x.location,'Producto o material':x.item,'Código':x.sku,'Lote':x.lot,'Cantidad del sistema':Number(x.systemQuantity),'Conteo físico':Number(x.countedQuantity),'Diferencia':Number(x.difference),'Unidad':x.uom,'Observaciones':x.observations,'Responsable':x.countedBy}));
+    if(window.XLSX){const workbook=XLSX.utils.book_new();const differences=details.filter(x=>Math.abs(Number(x.difference))>0.000001).length;const reliability=Math.round(((details.length-differences)/details.length)*10000)/100;const summary=[{'Indicador':'Confiabilidad de inventario','Resultado':`${reliability}%`,'Descripción':'Porcentaje de partidas cuyo conteo físico coincide con el sistema'},{'Indicador':'Partidas auditadas','Resultado':details.length,'Descripción':'Total de partidas incluidas en el reporte'},{'Indicador':'Partidas con diferencia','Resultado':differences,'Descripción':'Requieren análisis de causa y observaciones'},...(state.data.counts||[]).map(x=>({'Indicador':`Auditoría ${x.id}`,'Resultado':x.variance,'Descripción':`${x.warehouse} · ${countTypeLabel(x.scope)} · ${x.planned} · ${x.owner} · ${statusLabel(x.status)}`}))];XLSX.utils.book_append_sheet(workbook,XLSX.utils.json_to_sheet(summary),'Resumen');XLSX.utils.book_append_sheet(workbook,XLSX.utils.json_to_sheet(rows),'Diferencias y observaciones');XLSX.writeFile(workbook,`oleolab-auditoria-inventario-${new Date().toISOString().slice(0,10)}.xlsx`);return toast('Reporte de auditoría generado.');}
+    const keys=Object.keys(rows[0]);const csv=[keys.join(','),...rows.map(row=>keys.map(key=>csvValue(row[key])).join(','))].join('\r\n');const url=URL.createObjectURL(new Blob(['\ufeff',csv],{type:'text/csv;charset=utf-8'}));const anchor=document.createElement('a');anchor.href=url;anchor.download=`oleolab-auditoria-inventario-${new Date().toISOString().slice(0,10)}.csv`;document.body.appendChild(anchor);anchor.click();anchor.remove();URL.revokeObjectURL(url);toast('Reporte de auditoría generado.');
   }
 
   async function api(action, payload = {}, token = state.token) {
@@ -657,6 +942,15 @@
   function initials(name) { return String(name).split(/\s+/).slice(0, 2).map(x => x[0] || '').join('').toUpperCase(); }
   function n(value) { return new Intl.NumberFormat('es-MX', { maximumFractionDigits: 2 }).format(Number(value) || 0); }
   function dateFmt(value) { const date = new Date(`${value}T12:00:00`); return Number.isNaN(date.valueOf()) ? String(value ?? '') : new Intl.DateTimeFormat('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }).format(date); }
+  function itemTypeLabel(value){return ({RAW_FRUIT:'Aguacate en fruta',RAW_OTHER:'Otra materia prima',PACKAGING:'Material de empaque',SPARE_PART:'Refacción',CONSUMABLE:'Consumible',BULK_OIL:'Aceite a granel',FINISHED_GOOD:'Producto terminado',SERVICE:'Servicio'})[value]||String(value??'');}
+  function warehouseTypeLabel(value){return ({RAW_MATERIAL:'Materia prima',PACKAGING:'Materiales de empaque',SPARE_PARTS:'Refacciones',PROCESS:'Producto en proceso',FINISHED_GOODS:'Producto terminado',QUARANTINE:'Cuarentena',REJECTED:'Rechazados',RETURNS:'Devoluciones'})[value]||String(value??'');}
+  function unitLabel(value){return ({KG:'kilogramos',G:'gramos',L:'litros',ML:'mililitros',EA:'piezas',BOX:'cajas',BEAN:'contenedores de fruta',PALLET:'tarimas'})[value]||String(value??'');}
+  function qualityLabel(value){return ({APPROVED:'Liberado',CONDITIONAL:'Liberado con condición',PENDING:'Pendiente de revisión',REJECTED:'Rechazado y bloqueado'})[value]||String(value??'');}
+  function priorityLabel(value){return ({LOW:'Baja',NORMAL:'Normal',HIGH:'Alta',CRITICAL:'Crítica'})[value]||String(value??'');}
+  function countTypeLabel(value){return ({CYCLE:'Conteo cíclico',FULL:'Inventario total',SPOT:'Conteo selectivo',QUALITY_HOLD:'Pendiente de Calidad'})[value]||String(value??'');}
+  function weekdayLabels(value){const labels={MON:'Lunes',TUE:'Martes',WED:'Miércoles',THU:'Jueves',FRI:'Viernes',SAT:'Sábado',SUN:'Domingo'};return String(value??'').split(',').map(code=>labels[code]||code).join(', ');}
+  function movementTypeLabel(value){return ({RECEIPT:'Recepción',TRANSFER:'Transferencia',ISSUE_PRODUCTION:'Salida a producción',PRODUCTION_OUTPUT:'Entrada de producción',SHIPMENT:'Embarque',CUSTOMER_RETURN:'Devolución de cliente',SUPPLIER_RETURN:'Devolución a proveedor',QUALITY_RELEASE:'Liberación de Calidad',QUALITY_REJECT:'Rechazo de Calidad',COUNT_ADJUSTMENT:'Ajuste por auditoría',MAINTENANCE_ISSUE:'Salida a Mantenimiento',SCRAP:'Merma',REVERSAL:'Reversa',OTHER:'Inventario inicial'})[value]||String(value??'');}
+  function statusLabel(value){const key=String(value??'');return ({DRAFT:'Borrador',POSTED:'Contabilizado',CANCELLED:'Cancelado',PLANNED:'Planeado',SENT:'Enviado',CONFIRMED:'Confirmado',ARRIVED:'Llegó',IN_INSPECTION:'En inspección',COMPLETED:'Terminado',NO_SHOW:'No llegó',WAITING_QUALITY:'Esperando Calidad',PARTIALLY_ACCEPTED:'Aceptación parcial',ACCEPTED:'Aceptado',REJECTED:'Rechazado',REQUESTED:'Solicitado',SAMPLING:'En análisis',APPROVED:'Aprobado',CONDITIONAL:'Aprobación condicional',OPEN:'Abierto',BLOCKED:'Bloqueado',ACTIVE:'Activo',DISABLED:'Desactivado',LOCKED:'Bloqueado',INVITED:'Invitado',ASSIGNED:'Asignado',IN_PROGRESS:'En proceso',WAITING_PARTS:'Esperando materiales',VERIFIED:'Verificado y cerrado',CRITICAL:'Crítico',HIGH:'Alta',NORMAL:'Normal',LOW:'Baja',SHORTAGE:'Faltante',COVERED:'Cubierto',MATERIAL_CHECK:'Revisión de materiales',ON_HOLD:'En espera',FROZEN:'Congelado para conteo',COUNTING:'En conteo',RECOUNT:'Reconteo'})[key]||key;}
   function csvValue(value) { const text = String(value ?? ''); return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text; }
   function h(value) { return String(value ?? '').replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char])); }
 })();

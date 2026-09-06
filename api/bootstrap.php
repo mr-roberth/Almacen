@@ -80,7 +80,7 @@ function configureHttpSecurity(array $config): void
 function readJsonBody(): array
 {
     $raw = file_get_contents('php://input');
-    if ($raw === false || strlen($raw) > 1_000_000) {
+    if ($raw === false || strlen($raw) > 10_000_000) {
         failRequest('Solicitud demasiado grande.', 413);
     }
     try {
