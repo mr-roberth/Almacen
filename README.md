@@ -41,7 +41,7 @@ Navegador -> frontend estático -> API PHP 8.3 -> MySQL 8 en localhost
 - Solicitudes de Mantenimiento, varios técnicos, horas, bitácora, fotografías y avisos por correo.
 - Catálogos de ejemplo identificados con `[EJEMPLO]`, visibles en su área y sin cantidades ficticias de inventario.
 
-La instalación y actualización productiva se explican en `INSTALACION.md` y `ACTUALIZACION_V0.2.md`.
+La instalación, actualización y operación se explican en `INSTALACION.md`, `ACTUALIZACION_V0.2.md` y `GUIA_RAPIDA_MODULOS.md`.
 
 ## Repositorios
 
