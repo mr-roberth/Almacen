@@ -270,14 +270,15 @@
   async function login(event) {
     event.preventDefault();
     if (!configured()) return toast('Primero debe configurarse la URL de la API PHP.', true);
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     setLoading(true, 'Verificando acceso…');
     try {
       const result = await api('login', { email: form.get('email'), password: form.get('password') }, '');
       state.token = result.token;
       sessionStorage.setItem(TOKEN_KEY, state.token);
       await loadApplication();
-      event.currentTarget.reset();
+      formElement.reset();
     } catch (error) { toast(error.message, true); }
     finally { setLoading(false); }
   }
