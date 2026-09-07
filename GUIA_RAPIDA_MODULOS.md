@@ -1,112 +1,67 @@
-# Guía rápida de actualización y uso · Oleolab Almacenes 0.2
+# Guía sencilla de módulos · Oleolab Almacenes 0.3
 
-## Aplicar la actualización en el ambiente actual de pruebas
+## Regla principal de acceso
 
-1. En phpMyAdmin, exporte un respaldo completo de `ci4kash_Oleolab` antes de modificarla.
-2. Manteniendo seleccionada esa misma base, abra **Importar** y cargue `database/migration_v1_3.sql`. No vuelva a importar `database/schema.sql`.
-3. En el Administrador de archivos abra `public_html/Apps/Almacen`.
-4. Descargue o copie a un lugar seguro `api/config.local.php`. No debe eliminarse ni reemplazarse.
-5. Conserve también la carpeta `storage`, porque ahí se guardan las evidencias privadas de Mantenimiento.
-6. Cargue `oleolab-almacen-cpanel-v0.2.0.zip` en `public_html/Apps/Almacen`, extráigalo y acepte reemplazar los archivos de la aplicación.
-7. Confirme permisos `755` para carpetas, `644` para archivos y `750` o `755` para `storage/private/maintenance`.
-8. Abra `https://ci4kash.com/Apps/Almacen/api/index.php?action=health`. Debe indicar `"status":"ok"` y `"database":"connected"`.
-9. Abra `https://ci4kash.com/Apps/Almacen/`, cierre cualquier sesión anterior, presione `Ctrl+F5` y vuelva a iniciar sesión.
+Existe un solo **Administrador del sistema**. Es la única cuenta que puede abrir Administración y la bitácora global, crear usuarios, áreas y roles, y marcar con casillas los módulos de cada usuario. Un jefe de área administra la operación de su módulo, pero no crea cuentas ni puede entrar a la Administración global.
 
-## Orden sencillo para empezar a usarla
+## Panel de mi área
 
-1. En **Catálogos de mi área**, revise los registros `[EJEMPLO]` y capture sus productos y materiales reales.
-2. Cree los almacenes y ubicaciones reales antes de capturar cantidades.
-3. En **Levantamiento de inventario**, registre las existencias físicas iniciales. No necesita una cita de proveedor.
-4. En **Historial de auditorías**, programe los días de conteo; el día elegido haga la captura desde **Levantamiento de inventario → Auditoría física**.
-5. Registre la lista de materiales de cada producto terminado.
-6. Importe el archivo de Forecast y revise las necesidades calculadas.
-7. Cree usuarios, administradores de área y técnicos de Mantenimiento con únicamente los módulos que necesiten.
+Resume lo que requiere atención: existencias, materiales críticos, mayor consumo, faltantes del plan y cobertura del Forecast. El reporte ejecutivo descarga esas tablas a Excel. La información visible se limita a los módulos autorizados.
 
-## Qué se encuentra en cada módulo
+## Almacén de materia prima y aceites
 
-### Panel de mi área
+Registra por nombre aguacate en fruta, aceite crudo, aceite para refinar y aceite listo para envasar. Las unidades permitidas son kilogramos o litros. Permite crear el catálogo, capturar inventario inicial, auditar, recibir una cita WID y consultar existencias por lote.
 
-Muestra indicadores correspondientes al área del usuario. Para Almacenes incluye existencias, materiales críticos, artículos con mayor salida, faltantes contra el plan y cobertura del Forecast. Permite descargar un reporte ejecutivo en Excel.
+## Almacén de materiales de empaque
 
-### Planeación de Compras
+Registra por separado botella, tapa, sello, etiqueta frontal, etiqueta trasera, caja y cualquier otro empaque. Permite inventario inicial, auditoría, recepción WID y reporte analítico. No mezcla productos terminados, materias primas ni refacciones.
 
-Muestra próximas llegadas, citas por confirmar, retrasos y materiales que deben comprarse según el último cálculo de necesidades. Desde aquí se puede programar una llegada.
+## Almacén de refacciones
 
-### Citas y andenes
+Mantiene su propio catálogo, cantidades y auditorías. Puede recibir materiales esperados desde WID. Sus registros quedan disponibles para el seguimiento de Mantenimiento.
 
-Permite registrar y consultar citas de proveedores, recolecciones de fruta y devoluciones. Muestra fecha, hora, proveedor, material y estado.
+## Almacén de producto terminado
 
-### Recepciones
+El código de cada producto debe coincidir exactamente con el usado en el Forecast. Una entrada selecciona la orden de producción; la orden ya conserva la lista de materiales aprobada. Al guardar se consumen aceite y empaques según esa lista, se suma la merma real indicada y se crea el lote terminado. Si requiere Calidad, el lote queda bloqueado hasta el dictamen.
 
-Registra la llegada del proveedor, peso esperado y recibido, almacén y ubicación. Genera el pre-lote, el lote, la recepción, el movimiento de entrada y la solicitud de Calidad.
+## Inventarios y auditorías
 
-### Calidad
+**Inventario inicial** carga la existencia física actual sin proveedor ni cita y sólo se utiliza cuando todavía no existe saldo para ese producto, lote y ubicación. **Auditoría física** compara el sistema con el conteo y crea un ajuste trazable por la diferencia. Se pueden programar días y horarios y descargar un reporte con confiabilidad, diferencias, observaciones y responsable.
 
-Muestra las solicitudes pendientes y permite registrar inspecciones y dictámenes: aprobado, condicionado o rechazado. El material que requiere Calidad permanece bloqueado hasta recibir su dictamen.
+## Movimientos
 
-### Existencias
+Es el kardex de todas las entradas, salidas, consumos y ajustes autorizados. Un movimiento contabilizado no se edita ni se elimina; una corrección debe quedar como otro movimiento para conservar la historia.
 
-Consulta inventario por nombre, código, almacén y lote. Separa existencia, cantidad reservada y cantidad disponible. Permite descargar el inventario analítico.
+## Compras y WID
 
-### Movimientos
+Compras mantiene proveedores y orígenes y programa cada llegada con material, cantidad, almacén, fecha y hora. La cita genera un pre-lote y una partida WID, es decir, mercancía esperada. WID no suma existencia. Sólo Almacén convierte esa expectativa en recepción física.
 
-Es el kardex del inventario. Muestra entradas, salidas, transferencias, consumo, ajustes, usuario y ubicación. Los movimientos contabilizados no se editan directamente; las correcciones deben quedar como movimientos trazables.
+## Calidad
 
-### Levantamiento de inventario
+Recibe automáticamente solicitudes por recepciones, producto terminado y extracción. La bandeja separa pendientes e historial. En un dictamen parcial, **cantidad liberada + cantidad rechazada** debe ser igual a la recibida o producida. La liberada pasa a una ubicación disponible y la rechazada a una ubicación bloqueada.
 
-Tiene dos formas de captura:
+Para aguacate registra semana, fecha, cantidad, materias secas, dureza, rendimientos, ácidos grasos libres, estado, aceite extraído y acidez. Para extracción registra muestra de pulpa, pasta húmeda o pasta seca, turno, equipo, molienda, aceite, obtención, materia seca y humedad. El archivo Excel de Calidad contiene maestro de lotes, resultados de materia prima y resultados de extracción.
 
-- **Inventario inicial:** incorpora las existencias físicas actuales sin necesitar proveedor o cita.
-- **Auditoría física:** compara la cantidad del sistema contra la cantidad contada y genera un ajuste cuando existe diferencia.
+## Extracción
 
-Cada partida permite indicar almacén, ubicación, producto o material, lote, estado de Calidad, cantidad y observaciones.
+El usuario selecciona el lote real de aguacate, la cantidad alimentada, el número de contenedores y las horas. El sistema compara el ritmo contra la meta de 13 contenedores por hora, descuenta el lote de origen, genera el lote de proceso y solicita Calidad. El nuevo lote siempre conserva la relación con el lote de aguacate utilizado.
 
-### Historial de auditorías
+## Envasado
 
-Permite programar conteos por almacén, días de la semana, hora, tipo y alcance. Muestra la confiabilidad porcentual, partidas correctas, diferencias y observaciones. El reporte Excel incluye sistema, conteo físico, diferencia, responsable y explicación.
+Crea y modifica listas de materiales por producto terminado. Cada componente se elige de catálogo y lleva cantidad y merma esperada. Al crear una orden, la aplicación compara la necesidad con las existencias disponibles y marca faltantes. La lista queda fijada en la orden para evitar consumir materiales de otra presentación.
 
-### Forecast
+## Forecast y necesidades de materiales
 
-Importa un archivo Excel y valida que cada código coincida con un producto terminado activo. La primera carga se conserva como Forecast original y las posteriores como revisiones. Muestra original, vigente, diferencia e impacto.
+Forecast importa `.xlsx`, `.xls` o `.csv`, busca códigos de producto terminado y cantidades mensuales, conserva la primera versión como original y las siguientes como revisiones. El cálculo de necesidades explota las listas de materiales y muestra requerido, disponible, faltante y fecha. Un código que no existe en Producto terminado se reporta y no se importa silenciosamente.
 
-### MRP y necesidades
+## Mantenimiento
 
-Explota las listas de materiales del producto terminado y compara lo necesario contra existencias, reservas y niveles mínimos. Indica material, cantidad requerida, disponible, faltante, fecha y acción sugerida. Se recalcula al cambiar Forecast, listas de materiales o inventario.
+Cualquier usuario autorizado puede crear una solicitud con equipo, descripción, prioridad, fecha, materiales y fotografías opcionales. Se notifica por correo a los responsables configurados. El jefe o administrador de Mantenimiento registra como técnicos a usuarios existentes del área, asigna una o varias personas y horas estimadas. Cada técnico recibe correo y puede informar trabajo en proceso, espera de refacciones o término, horas, observaciones y fotografías. La jefatura verifica el cierre.
 
-### Órdenes de producción
+## Embarques, rechazos y devoluciones
 
-Consulta las órdenes registradas en la base, cantidades planeadas y terminadas, cliente, ventana de producción, disponibilidad de materiales y situación de cumplimiento.
+Embarques es consulta y reporte de salidas ya registradas. Rechazos y devoluciones conserva cliente, producto, lote, cantidad, referencia y motivo para seguimiento sin borrar el movimiento original.
 
-### Lotes y extracción
+## Catálogos de ejemplo
 
-Busca un lote exacto y presenta su origen, proveedor, Calidad y relaciones de transformación. Permite seguir lotes padres e hijos para conservar la trazabilidad de extracción y envasado.
-
-### Embarques
-
-Consulta surtido, pedido, cliente, cita, bultos y estado del embarque. La programación operativa completa de salidas se continuará conectando con las órdenes y citas de Logística.
-
-### Rechazos y devoluciones
-
-Registra devoluciones de cliente indicando producto, lote, cantidad, referencia y motivo. Conserva el seguimiento y permite relacionar posteriormente el dictamen de Calidad.
-
-### Mantenimiento
-
-Permite levantar solicitudes, indicar equipo, ubicación, prioridad, fecha, materiales requeridos y descripción. El responsable de Mantenimiento puede asignar varios técnicos y horas. Los técnicos registran avance, horas, observaciones y fotografías.
-
-### Catálogos de mi área
-
-Presenta ventanas separadas según el área. Almacenes registra materias primas y aceites, materiales de empaque, refacciones, producto terminado, almacenes, ubicaciones y listas de materiales. Compras registra proveedores y orígenes. Ventas registra clientes. Mantenimiento registra técnicos.
-
-Los registros `[EJEMPLO]` son una guía y no crean cantidades de inventario. Cuando dejen de ser necesarios, se pueden desactivar importando opcionalmente `database/disable_examples.sql`.
-
-### Usuarios de mi área
-
-El administrador general crea áreas, roles, administradores de área y usuarios. Los módulos se asignan con casillas. Un administrador de área solamente administra a los usuarios de su propia área. Mantenimiento puede registrar técnicos con acceso a sus tareas.
-
-### Bitácora del sistema
-
-Disponible para el administrador general. Registra quién realizó cada cambio, fecha, área, acción, entidad y referencia. Sirve para investigar correcciones y proteger la integridad de la información.
-
-## Recomendación para las pruebas
-
-Use prefijos como `PRUEBA-` en productos, lotes y proveedores mientras valida el funcionamiento. Debido a que ésta es la base de pruebas, las capturas sí modificarán sus existencias de prueba, movimientos, auditorías y necesidades, pero no afectarán otra base ni otro servicio.
+Los nombres que comienzan con `[EJEMPLO]` sirven para practicar: almacenes, ubicaciones, proveedor, origen, cliente, aguacate, aceites, botellas, tapas, sellos, etiquetas, cajas, refacción, producto terminado, equipo y lista de materiales. No crean existencia ficticia. Después de validar el flujo pueden desactivarse con `database/disable_examples.sql`.

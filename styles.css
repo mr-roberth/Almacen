@@ -290,3 +290,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--green); box-shad
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+.waste-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.waste-grid label { margin: 0; }
+.waste-grid small { display: block; margin-top: 4px; color: var(--muted); }
+@media (max-width: 720px) { .waste-grid { grid-template-columns: 1fr; } }
