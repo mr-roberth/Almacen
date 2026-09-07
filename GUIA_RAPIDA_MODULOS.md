@@ -1,4 +1,4 @@
-# Guía sencilla de módulos · Oleolab Almacenes 0.3.1
+# Guía sencilla de módulos · Oleolab Almacenes 0.3.2
 
 ## Regla principal de acceso
 
@@ -62,6 +62,8 @@ Cualquier usuario autorizado puede crear una solicitud con equipo, descripción,
 
 Embarques es consulta y reporte de salidas ya registradas. Rechazos y devoluciones conserva cliente, producto, lote, cantidad, referencia y motivo para seguimiento sin borrar el movimiento original.
 
-## Catálogos de ejemplo
+## Almacenes, zonas y sugerencias
 
-Los nombres que comienzan con `[EJEMPLO]` sirven para practicar: almacenes, ubicaciones, proveedor, origen, cliente, aguacate, aceites, botellas, tapas, sellos, etiquetas, cajas, refacción, producto terminado, equipo y lista de materiales. No crean existencia ficticia. Después de validar el flujo pueden desactivarse con `database/disable_examples.sql`.
+Los almacenes de materia prima, materiales de empaque, refacciones y producto terminado son configuración operativa oficial. **Existencia disponible** contiene material liberado; **Recepción temporal** contiene mercancía recién llegada; **Pendiente de liberación por Calidad** mantiene producto bloqueado; y **Producto rechazado** nunca forma parte de la existencia utilizable.
+
+Los nombres de botellas, tapas, sellos, etiquetas y cajas aparecen como sugerencias al crear un material, pero no son registros ni generan existencia hasta que el usuario proporciona su código y guarda el alta.

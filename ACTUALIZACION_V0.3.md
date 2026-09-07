@@ -1,4 +1,4 @@
-# Actualización del ambiente de pruebas a la versión 0.3.1
+# Actualización del ambiente de pruebas a la versión 0.3.2
 
 Esta actualización conserva la conexión actual, los usuarios, los movimientos y las existencias. El paquete no incluye `api/config.local.php` ni fotografías guardadas en `storage`.
 
@@ -6,16 +6,16 @@ Esta actualización conserva la conexión actual, los usuarios, los movimientos 
 
 1. Cambie en cPanel la contraseña del usuario MySQL que utiliza esta aplicación. Una contraseña anterior apareció en una captura compartida y ya no debe considerarse secreta. Actualice la nueva contraseña sólo dentro de `api/config.local.php`; no la suba a GitHub ni la envíe por mensaje.
 2. En phpMyAdmin seleccione `ci4kash_Oleolab` y use **Exportar → Rápido → SQL**. Guarde ese respaldo antes de continuar.
-3. Sin cambiar de base, abra **Importar** y cargue únicamente `database/migration_v1_4.sql`. Debe aparecer el mensaje verde de importación exitosa. No vuelva a importar `schema.sql` ni `migration_v1_3.sql` si ya los aplicó.
+3. Sin cambiar de base, abra **Importar** y cargue `database/migration_v1_5.sql` después de la migración 1.4. Debe aparecer el mensaje verde de importación exitosa. No vuelva a importar `schema.sql` ni las migraciones anteriores si ya las aplicó.
 4. En cPanel abra `public_html/Apps/Almacen` y descargue una copia de `api/config.local.php`. No lo borre ni lo reemplace durante la extracción.
 5. Conserve la carpeta `storage`, porque contiene las evidencias privadas de Mantenimiento.
-6. Cargue `oleolab-almacen-cpanel-v0.3.1.zip` en esa misma carpeta. Selecciónelo, pulse **Extraer** y acepte reemplazar archivos existentes. El mensaje `inflating` significa que la extracción terminó correctamente.
-7. Compruebe que estén estos archivos nuevos: `api/v14.php`, `database/migration_v1_4.sql` y `ACTUALIZACION_V0.3.md`.
+6. Cargue `oleolab-almacen-cpanel-v0.3.2.zip` en esa misma carpeta. Selecciónelo, pulse **Extraer** y acepte reemplazar archivos existentes. El mensaje `inflating` significa que la extracción terminó correctamente.
+7. Compruebe que estén estos archivos: `api/v14.php`, `database/migration_v1_5.sql` y `ACTUALIZACION_V0.3.md`.
 8. Confirme permisos recomendados: carpetas `755`, archivos `644`, `api/config.local.php` `600` y `storage/private/maintenance` `750` o `755` según admita el hosting.
 9. Abra `https://ci4kash.com/Apps/Almacen/api/index.php?action=health`. La respuesta debe incluir `"status":"ok"` y `"database":"connected"`.
 10. Abra `https://ci4kash.com/Apps/Almacen/`, cierre la sesión anterior si sigue abierta, presione `Ctrl+F5` e inicie sesión otra vez.
 
-La versión 0.3.1 impide que el navegador conserve un `index.html` anterior. Esto evita errores como `Cannot read properties of null (reading 'reset')` después de actualizar archivos.
+La versión 0.3.2 conserva la corrección de caché y además convierte los almacenes base en registros oficiales, aclara sus zonas y retira los artículos ficticios de todos los combos.
 
 ## Prueba mínima recomendada
 

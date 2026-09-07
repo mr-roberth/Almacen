@@ -16,6 +16,7 @@ Navegador -> frontend estático -> API PHP 8.3 -> MySQL 8 en localhost
 - `database/schema.sql`: esquema MySQL 8.0, catálogos base, vistas, controles y procedimientos.
 - `database/migration_v1_3.sql`: actualización aditiva para una base v1.2 ya instalada.
 - `database/migration_v1_4.sql`: módulos separados, WID, Calidad analítica, Envasado y Extracción trazable.
+- `database/migration_v1_5.sql`: almacenes base oficiales, zonas claras y ejemplos únicamente como sugerencias.
 - `assets/xlsx.full.min.js`: lector local de Excel utilizado por el importador de Forecast.
 - `private-tools/create_admin.php`: creación por consola del único superadministrador.
 - `INSTALACION.md`: publicación paso a paso en cPanel.
@@ -29,7 +30,7 @@ Navegador -> frontend estático -> API PHP 8.3 -> MySQL 8 en localhost
 - Consultas preparadas, política CSP, restricción de origen y carpetas sin listado.
 - Movimientos contabilizados inmutables; las correcciones se realizan con reversas.
 
-## Funciones de la versión 0.3.1
+## Funciones de la versión 0.3.2
 
 - Paneles diferenciados de Almacenes, Compras, Calidad y Mantenimiento.
 - Administración exclusiva del único superadministrador, roles personalizados y módulos seleccionados con casillas.
@@ -40,7 +41,7 @@ Navegador -> frontend estático -> API PHP 8.3 -> MySQL 8 en localhost
 - Listas de materiales y cálculo automático de necesidades contra existencias y reservas.
 - Reporte analítico de inventario y reporte ejecutivo en Excel.
 - Solicitudes de Mantenimiento, varios técnicos, horas, bitácora, fotografías y avisos por correo.
-- Catálogos de ejemplo identificados con `[EJEMPLO]`, visibles en su área y sin cantidades ficticias de inventario.
+- Almacenes base listos para operar y sugerencias de nombres que no crean registros ficticios.
 - WID sin afectación física, pre-lote desde la cita y recepción con solicitud automática de Calidad.
 - Dictámenes parciales, resultados analíticos de aguacate y extracción, y maestro de lotes exportable.
 - Órdenes de Envasado, consumo automático por lista de materiales, merma y entrada trazable a producto terminado.

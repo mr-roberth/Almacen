@@ -29,7 +29,7 @@
   const OPERATION_META = {
     appointment:['COMPRAS Y LOGÍSTICA','Programar llegada'],receipt:['ALMACÉN','Registrar recepción'],movement:['INVENTARIO','Registrar movimiento'],
     quality:['CALIDAD','Solicitar inspección'],qualityDecision:['CALIDAD','Registrar dictamen'],count:['ALMACÉN','Programar conteo'],return:['DEVOLUCIONES','Registrar devolución'],
-    user:['USUARIOS','Registrar usuario'],supplier:['COMPRAS','Registrar proveedor'],origin:['COMPRAS','Registrar origen'],warehouse:['ALMACENES','Registrar almacén'],location:['ALMACENES','Registrar ubicación'],item:['CATÁLOGOS','Registrar producto o material'],itemRaw:['ALMACÉN DE MATERIA PRIMA','Registrar materia prima o aceite'],itemPackaging:['ALMACÉN DE MATERIALES DE EMPAQUE','Registrar material de empaque'],itemSpare:['ALMACÉN DE REFACCIONES','Registrar refacción'],itemFinished:['ALMACÉN DE PRODUCTO TERMINADO','Registrar producto terminado'],customer:['VENTAS','Registrar cliente'],bom:['PLANEACIÓN DE MATERIALES','Agregar componente a una lista de materiales'],
+    user:['USUARIOS','Registrar usuario'],supplier:['COMPRAS','Registrar proveedor'],origin:['COMPRAS','Registrar origen'],warehouse:['ALMACENES','Registrar almacén'],location:['ALMACENES','Registrar ubicación'],warehouseModule:['ALMACENES','Registrar almacén operativo'],locationModule:['ALMACENES','Registrar zona física'],item:['CATÁLOGOS','Registrar producto o material'],itemRaw:['ALMACÉN DE MATERIA PRIMA','Registrar materia prima o aceite'],itemPackaging:['ALMACÉN DE MATERIALES DE EMPAQUE','Registrar material de empaque'],itemSpare:['ALMACÉN DE REFACCIONES','Registrar refacción'],itemFinished:['ALMACÉN DE PRODUCTO TERMINADO','Registrar producto terminado'],customer:['VENTAS','Registrar cliente'],bom:['PLANEACIÓN DE MATERIALES','Agregar componente a una lista de materiales'],
     area:['ADMINISTRACIÓN','Registrar área'],role:['ADMINISTRACIÓN','Registrar rol'],technicianV14:['MANTENIMIENTO','Registrar técnico'],forecastImport:['PLANEACIÓN','Importar Forecast desde Excel'],maintenanceRequest:['MANTENIMIENTO','Registrar solicitud'],maintenanceAssignment:['MANTENIMIENTO','Asignar técnicos'],maintenanceUpdate:['MANTENIMIENTO','Responder tarea'],auditSchedule:['AUDITORÍA DE INVENTARIO','Programar días de auditoría'],
     appointmentV14:['COMPRAS','Programar llegada y WID'],receiptV14:['ALMACÉN','Confirmar recepción'],productionOrder:['ENVASADO','Crear orden de producción'],productionCompletion:['PRODUCTO TERMINADO','Registrar producto terminado'],extractionBatch:['EXTRACCIÓN','Ingresar lote a extracción'],qualityDecisionV14:['CALIDAD','Capturar resultados y dictamen'],qualityCancel:['CALIDAD','Cancelar solicitud']
   };
@@ -437,11 +437,13 @@
     const actions=[
       canInitial?`<button class="btn ghost" data-stocktake-type="${warehouseType}">Inventario físico</button>`:'',
       canAudit?`<button class="btn ghost" data-stocktake-type="${warehouseType}" data-audit-mode="audit">Auditar</button>`:'',
+      canCreate?`<button class="btn ghost" data-open-operation="warehouseModule" data-warehouse-type="${warehouseType}">Nuevo almacén</button>`:'',
+      canCreate?`<button class="btn ghost" data-open-operation="locationModule" data-warehouse-type="${warehouseType}">Nueva zona</button>`:'',
       canCreate?`<button class="btn ghost" data-open-operation="${itemOperation}">${finished?'Nuevo producto':'Nuevo material'}</button>`:'',
       canReceive?'<button class="btn primary" data-open-operation="receiptV14">Recibir cita WID</button>':'',
       canComplete?'<button class="btn primary" data-open-operation="productionCompletion">Registrar producto terminado</button>':''
     ].join('');
-    $('#view').innerHTML=`<div class="section-head"><div><h2>Almacén de ${h(title.toLowerCase())}</h2><p class="muted">Catálogo y existencias de este almacén, sin mezclar artículos de otras áreas.</p></div>${actions?`<div class="actions">${actions}</div>`:''}</div>
+    $('#view').innerHTML=`<div class="section-head"><div><h2>Almacén de ${h(title.toLowerCase())}</h2><p class="muted">Catálogo y existencias de este almacén, sin mezclar artículos de otras áreas. Las zonas indican dónde y en qué condición se encuentra físicamente cada material.</p></div>${actions?`<div class="actions">${actions}</div>`:''}</div>
       <div class="metric-grid">${metric('Productos o materiales',n(catalog.length),'◇','Catálogo activo')}${metric('Lotes o ubicaciones',n(inventory.length),'▦','Con existencia registrada')}${metric('Sin disponible',n(inventory.filter(x=>Number(x.available)<=0).length),'!','Bloqueado o agotado',inventory.some(x=>Number(x.available)<=0)?'danger':'')}${metric('Críticos',n(inventory.filter(x=>x.status==='Crítico').length),'◷','Según punto de reorden',inventory.some(x=>x.status==='Crítico')?'warning':'')}</div>
       <section class="card"><div class="card-head"><div><h3>Existencias</h3><p>Cantidad física y disponible por lote.</p></div><button class="btn ghost small" data-export>Descargar</button></div>${table(['Producto o material','Almacén','Lote','Existencia','Disponible','Unidad','Estado'],inventory.map(x=>[cell(x.item,x.sku),x.warehouse,folio(x.lot),n(x.onHand),n(x.available),unitLabel(x.uom),badge(x.status)]),'No hay existencias registradas en este almacén.')}</section>
       <section class="card page-gap"><div class="card-head"><div><h3>Catálogo de ${h(title.toLowerCase())}</h3><p>Primero crea el artículo; después captura su inventario físico.</p></div></div>${table(['Código','Nombre','Unidad','Control por lote','Calidad'],catalog.map(x=>[folio(x.sku),x.name,unitLabel(x.uom_code),Number(x.lot_controlled)?'Sí':'No',Number(x.quality_required)?'Requerida':'No requerida']),'No hay artículos en este catálogo.')}</section>`;
@@ -600,7 +602,7 @@
         <div class="form-grid">
           <label>Almacén<select id="capture-warehouse" required><option value="">Selecciona un almacén</option>${warehouses.map(x=>`<option value="${h(x.id)}">${h(x.name)}</option>`).join('')}</select></label>
           <label>Fecha del levantamiento<input id="capture-date" type="date" value="${new Date().toISOString().slice(0,10)}" required></label>
-          <label>Ubicación<select id="capture-location" required><option value="">Selecciona primero el almacén</option>${locations.map(x=>`<option value="${h(x.id)}" data-warehouse="${h(x.warehouse_id)}">${h(x.warehouse_name)} · ${h(x.name)}</option>`).join('')}</select></label>
+          <label>Dónde está físicamente<select id="capture-location" required><option value="">Selecciona primero el almacén</option>${locations.map(x=>`<option value="${h(x.id)}" data-warehouse="${h(x.warehouse_id)}" data-location-type="${h(x.location_type)}" data-blocked="${h(x.is_blocked)}">${h(x.name)}</option>`).join('')}</select><small id="capture-location-help">Elige el almacén y el estado de Calidad; mostraremos sólo las zonas adecuadas.</small></label>
           <label>Producto o material<select id="capture-item" required><option value="">Selecciona por nombre</option>${items.map(x=>`<option value="${h(x.id)}">${h(x.name)} · ${h(x.uom_name)}</option>`).join('')}</select></label>
           <label>Lote<input id="capture-lot" maxlength="100" placeholder="Solo cuando el material controla lote"></label>
           <label>Estado de Calidad<select id="capture-quality"><option value="APPROVED">Liberado</option><option value="CONDITIONAL">Liberado con condición</option><option value="PENDING">Pendiente de revisión</option><option value="REJECTED">Rechazado y bloqueado</option></select></label>
@@ -621,6 +623,7 @@
     $('[data-clear-stocktake]')?.addEventListener('click',()=>{state.inventoryWarehouseType='';state.inventoryCaptureLines=[];renderPage();});
     if(mayCapture){
       $('#capture-warehouse').addEventListener('change', filterCaptureLocations);
+      $('#capture-quality').addEventListener('change', filterCaptureLocations);
       $('#capture-add-line').addEventListener('click', addCaptureLine);
       $('#capture-save').addEventListener('click', saveCapture);
       bindCaptureLineActions();
@@ -630,8 +633,13 @@
 
   function filterCaptureLocations() {
     const warehouse = $('#capture-warehouse')?.value || '';
-    $$('#capture-location option[data-warehouse]').forEach(option => { option.hidden = option.dataset.warehouse !== warehouse; });
+    const quality=$('#capture-quality')?.value||'APPROVED';
+    const allowedTypes=quality==='REJECTED'?['REJECTED']:quality==='PENDING'?['RECEIVING','QUALITY_HOLD']:['STORAGE','PICKING'];
+    $$('#capture-location option[data-warehouse]').forEach(option => { option.hidden = option.dataset.warehouse !== warehouse||!allowedTypes.includes(option.dataset.locationType); });
     if ($('#capture-location')?.selectedOptions[0]?.hidden) $('#capture-location').value = '';
+    const visible=$$('#capture-location option[data-warehouse]').filter(option=>!option.hidden);
+    if(visible.length===1)$('#capture-location').value=visible[0].value;
+    const help=$('#capture-location-help');if(help)help.textContent=quality==='REJECTED'?'El producto quedará bloqueado y no contará como existencia disponible.':quality==='PENDING'?'Usa recepción temporal para material recién llegado que todavía espera revisión.':'Existencia disponible significa que el material está liberado y puede utilizarse.';
   }
 
   function addCaptureLine() {
@@ -737,7 +745,7 @@
       for(const technician of lookups.technicians||[])records.push({catalog:'Técnico',name:technician.name,code:technician.email,detail:technician.specialties||'Sin especialidad indicada'});
     }
     const filtered=filterRows(records,['catalog','name','code','detail']).slice(0,200);
-    return `<section class="card page-gap"><div class="card-head"><div><h3>Registros activos</h3><p>Los registros marcados como [EJEMPLO] sirven como guía y no tienen existencias ficticias.</p></div></div>${table(['Catálogo','Nombre','Código','Detalle'],filtered.map(row=>[row.catalog,cell(row.name,row.detail),folio(row.code),row.name.startsWith('[EJEMPLO]')?badge('Ejemplo'):'Activo']),'Todavía no hay registros activos en los catálogos de tu área.')}</section>`;
+    return `<section class="card page-gap"><div class="card-head"><div><h3>Registros activos</h3><p>Aquí se muestran únicamente datos oficiales. Las sugerencias de captura no crean registros hasta que presiones Guardar.</p></div></div>${table(['Catálogo','Nombre','Código','Detalle'],filtered.map(row=>[row.catalog,cell(row.name,row.detail),folio(row.code),badge('Activo')]),'Todavía no hay registros activos en los catálogos de tu área.')}</section>`;
   }
 
   function renderUsers() {
@@ -791,7 +799,7 @@
 
   function bindCommonActions() {
     $$('[data-page-link]').forEach(button => button.addEventListener('click', () => navigate(button.dataset.pageLink, true)));
-    $$('[data-open-operation]').forEach(button => button.addEventListener('click', () => openOperation(button.dataset.openOperation)));
+    $$('[data-open-operation]').forEach(button => button.addEventListener('click', () => openOperation(button.dataset.openOperation,{warehouseType:button.dataset.warehouseType||''})));
     $$('[data-open-alerts]').forEach(button => button.addEventListener('click', openAlerts));
     $$('[data-export]').forEach(button => button.addEventListener('click', exportCurrentPage));
     $$('[data-executive-report]').forEach(button => button.addEventListener('click', exportExecutiveReport));
@@ -833,6 +841,8 @@
     const type=$('#operation-type').value;const lookups=state.data?.lookups||{};let markup=operationFields[type]||'';
     if(type==='user') markup=userFields(lookups);
     if(['item','itemRaw','itemPackaging','itemSpare','itemFinished'].includes(type)) markup=itemFields(lookups,type);
+    if(type==='warehouseModule') markup=warehouseModuleFields(state.operationContext?.warehouseType);
+    if(type==='locationModule') markup=locationModuleFields(lookups,state.operationContext?.warehouseType);
     if(type==='role') markup=roleFields(lookups);
     if(type==='origin') markup=originFields(lookups);
     if(type==='bom') markup=bomFields(lookups);
@@ -864,10 +874,23 @@
 
   function itemFields(lookups, variant='item') {
     const typeField={itemRaw:'<label>Tipo de materia prima<select name="item_type" required><option value="RAW_FRUIT">Aguacate en fruta</option><option value="BULK_OIL">Aceite crudo, para refinar o listo para envasar</option><option value="RAW_OTHER">Otra materia prima</option></select></label>',itemPackaging:'<input name="item_type" type="hidden" value="PACKAGING">',itemSpare:'<input name="item_type" type="hidden" value="SPARE_PART">',itemFinished:'<input name="item_type" type="hidden" value="FINISHED_GOOD">'}[variant]||'<label>Tipo<select name="item_type" required><option value="RAW_FRUIT">Aguacate en fruta</option><option value="BULK_OIL">Aceite crudo, para refinar o listo para envasar</option><option value="RAW_OTHER">Otra materia prima</option><option value="PACKAGING">Material de empaque</option><option value="SPARE_PART">Refacción</option><option value="CONSUMABLE">Consumible</option><option value="FINISHED_GOOD">Producto terminado</option></select></label>';
-    const example=variant==='itemFinished'?'Código exacto usado en el Forecast':variant==='itemPackaging'?'Ej. Botella de vidrio de 500 mililitros':'Código interno único';
+    const example=variant==='itemFinished'?'Código exacto usado en el Forecast':variant==='itemPackaging'?'Ej. BOTELLA-VIDRIO-500-ML':'Código interno único';
     const category=variant==='item'?`<label>Categoría<select name="category_code" required><option value="">Selecciona la categoría</option>${(lookups.categories||[]).map(x=>`<option value="${h(x.code)}">${h(x.name)}</option>`).join('')}</select></label>`:'';
     const hint=variant==='itemPackaging'?'<p class="span-2 muted">Registra cada material por su nombre completo: botella, tapa, sello, etiqueta frontal, etiqueta trasera o caja.</p>':variant==='itemFinished'?'<p class="span-2 muted">El código debe coincidir exactamente con el usado en el Forecast.</p>':'';
-    return `<label>Código del producto o material<input name="sku" required maxlength="80" placeholder="${example}"></label><label>Nombre completo<input name="item_name" required maxlength="190"></label>${typeField}${category}<label>Unidad base<select name="uom_code" required><option value="">Selecciona la unidad</option>${(lookups.units||[]).map(x=>`<option value="${h(x.code)}">${h(x.name)}</option>`).join('')}</select></label><label>Punto de reorden<input name="reorder_point" type="number" min="0" step="0.001" value="0"></label>${hint}`;
+    const suggestions={itemRaw:['Aguacate Hass en fruta','Aceite crudo de aguacate','Aceite refinado listo para envasar'],itemPackaging:['Botella de vidrio de 500 mililitros','Tapa para botella de 500 mililitros','Sello para botella de 500 mililitros','Etiqueta frontal de 500 mililitros','Etiqueta trasera de 500 mililitros','Caja para doce botellas de 500 mililitros'],itemSpare:['Rodamiento para equipo de extracción'],itemFinished:['Aceite de aguacate en botella de 500 mililitros']}[variant]||[];
+    const suggestionList=suggestions.length?`<datalist id="item-name-suggestions">${suggestions.map(name=>`<option value="${h(name)}"></option>`).join('')}</datalist>`:'';
+    return `<label>Código del producto o material<input name="sku" required maxlength="80" placeholder="${example}"></label><label>Nombre completo<input name="item_name" required maxlength="190" ${suggestions.length?'list="item-name-suggestions"':''} placeholder="Escribe o elige una sugerencia">${suggestionList}</label>${typeField}${category}<label>Unidad base<select name="uom_code" required><option value="">Selecciona la unidad</option>${(lookups.units||[]).map(x=>`<option value="${h(x.code)}">${h(x.name)}</option>`).join('')}</select></label><label>Punto de reorden<input name="reorder_point" type="number" min="0" step="0.001" value="0"></label>${hint}`;
+  }
+
+  function warehouseModuleFields(warehouseType) {
+    const labels={RAW_MATERIAL:['MP','Almacén de materia prima'],PACKAGING:['EMPAQUE','Almacén de materiales de empaque'],SPARE_PARTS:['REFACCIONES','Almacén de refacciones'],FINISHED_GOODS:['PT','Almacén de producto terminado']};
+    const [code,name]=labels[warehouseType]||['ALMACEN','Almacén operativo'];
+    return `<input name="warehouse_type" type="hidden" value="${h(warehouseType||'')}"><label>Código interno<input name="warehouse_code" required maxlength="30" placeholder="${h(code)}"><small>Se usa para trazabilidad; el usuario verá principalmente el nombre.</small></label><label>Nombre visible<input name="warehouse_name" required maxlength="120" value="${h(name)}"></label><p class="span-2 muted">Este registro representa el almacén físico oficial. Después agrega sus zonas, como existencia disponible o recepción temporal.</p>`;
+  }
+
+  function locationModuleFields(lookups,warehouseType) {
+    const warehouses=(lookups.warehouses||[]).filter(x=>x.warehouse_type===warehouseType);
+    return `<label class="span-2">Almacén<select name="warehouse_code" required><option value="">Selecciona el almacén físico</option>${warehouses.map(x=>`<option value="${h(x.code)}">${h(x.name)}</option>`).join('')}</select></label><label>Tipo de zona<select id="location-type" name="location_type" required><option value="STORAGE">Existencia disponible</option><option value="RECEIVING">Recepción temporal · recién llegada</option><option value="QUALITY_HOLD">Pendiente de liberación por Calidad</option><option value="PICKING">Preparación de surtido</option><option value="SHIPPING">Preparación de embarque</option><option value="REJECTED">Producto rechazado · no disponible</option></select></label><label>Código interno<input id="location-code" name="location_code" required maxlength="50" value="ALMACENAMIENTO"></label><label class="span-2">Nombre visible<input id="location-name" name="location_name" required maxlength="120" value="Existencia disponible"></label><input id="location-blocked" name="is_blocked" type="hidden" value="0"><p class="span-2 muted">La aplicación usa la zona para separar material disponible, recién recibido, pendiente de Calidad o rechazado sin perder trazabilidad.</p>`;
   }
 
   function roleFields(lookups) {
@@ -926,7 +949,10 @@
     if(type==='extractionBatch'){$('#extraction-source')?.addEventListener('change',()=>{$('#extraction-source-location').value=$('#extraction-source').selectedOptions[0]?.dataset.location||'';});$('#extraction-source')?.dispatchEvent(new Event('change'));}
     if(type==='qualityDecisionV14'){$('#quality-request')?.addEventListener('change',configureQualityForm);$('#quality-disposition')?.addEventListener('change',configureQualityQuantities);$('[name="oil_obtained_qty"]')?.addEventListener('input',configureQualityQuantities);configureQualityForm();}
     if(type==='productionCompletion'){$('#completion-order')?.addEventListener('change',renderCompletionWaste);renderCompletionWaste();}
+    if(type==='locationModule'){$('#location-type')?.addEventListener('change',configureLocationType);configureLocationType();}
   }
+
+  function configureLocationType(){const type=$('#location-type')?.value||'STORAGE';const values={STORAGE:['ALMACENAMIENTO','Existencia disponible','0'],RECEIVING:['RECIBO','Recepción temporal · mercancía recién llegada','0'],QUALITY_HOLD:['CUARENTENA','Pendiente de liberación por Calidad','1'],PICKING:['SURTIDO','Preparación de surtido','0'],SHIPPING:['EMBARQUE','Preparación de embarque','0'],REJECTED:['RECHAZADO','Producto rechazado · no disponible','1']}[type];if(!values)return;$('#location-code').value=values[0];$('#location-name').value=values[1];$('#location-blocked').value=values[2];}
 
   function filterAppointmentOrigins(){const supplier=$('#appointment-supplier')?.value||'';$$('#appointment-origin option[data-supplier]').forEach(x=>x.hidden=x.dataset.supplier!==supplier);if($('#appointment-origin')?.selectedOptions[0]?.hidden)$('#appointment-origin').value='';}
   function filterAppointmentWarehouses(){const type=$('#appointment-item')?.selectedOptions[0]?.dataset.itemType||'';const expected={RAW_FRUIT:'RAW_MATERIAL',RAW_OTHER:'RAW_MATERIAL',BULK_OIL:'RAW_MATERIAL',PACKAGING:'PACKAGING',CONSUMABLE:'PACKAGING',SPARE_PART:'SPARE_PARTS'}[type]||'';$$('#appointment-warehouse option[data-warehouse-type]').forEach(x=>x.hidden=x.dataset.warehouseType!==expected);if($('#appointment-warehouse')?.selectedOptions[0]?.hidden)$('#appointment-warehouse').value='';}
@@ -965,7 +991,7 @@
   async function submitOperation(event) {
     event.preventDefault();
     const form = event.currentTarget;
-    const formData=new FormData(form);const payload=formDataToObject(formData);const type=$('#operation-type').value;payload.operation_type=['itemRaw','itemPackaging','itemSpare','itemFinished'].includes(type)?'warehouseItem':type;
+    const formData=new FormData(form);const payload=formDataToObject(formData);const type=$('#operation-type').value;payload.operation_type=['itemRaw','itemPackaging','itemSpare','itemFinished'].includes(type)?'warehouseItem':type==='warehouseModule'?'warehouse':type==='locationModule'?'location':type;
     if(type==='maintenanceAssignment'){
       const ids=formData.getAll('technician_user_ids');payload.assignments=ids.map(id=>({technician_user_id:Number(id),estimated_hours:Number(formData.get(`hours_${id}`)||0)}));
     }

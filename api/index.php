@@ -585,12 +585,13 @@ function createSupplierOrigin(PDO $pdo, array $user, array $payload): array
 function createWarehouse(PDO $pdo, array $user, array $payload): array
 {
     requireArea($pdo,$user,['ALMACEN']);
-    requirePermission($pdo,(int)$user['id'],'CATALOGS','CREATE');
-    $code=masterCode($payload,'warehouse_code','el código de almacén',30);
     $types=['RAW_MATERIAL','PACKAGING','SPARE_PARTS','PROCESS','FINISHED_GOODS','QUARANTINE','REJECTED','RETURNS'];
     $type=requiredString($payload,'warehouse_type','el tipo de almacén',30); if(!in_array($type,$types,true))failRequest('El tipo de almacén no es válido.',422);
+    $module=['RAW_MATERIAL'=>'WAREHOUSE_RAW','PACKAGING'=>'WAREHOUSE_PACKAGING','SPARE_PARTS'=>'WAREHOUSE_SPARES','FINISHED_GOODS'=>'WAREHOUSE_FINISHED'][$type]??'CATALOGS';
+    requireAnyPermissionV14($pdo,(int)$user['id'],[$module,'CATALOGS'],'CREATE');
+    $code=masterCode($payload,'warehouse_code','el código de almacén',30);
     if(safeScalar($pdo,"SELECT COUNT(*) FROM warehouses WHERE code=:code",['code'=>$code])>0)failRequest('El código de almacén ya existe.',409);
-    $areaId=null;$areaCode=trim((string)($payload['area_code']??''));if($areaCode!==''){$area=findOne($pdo,"SELECT id FROM areas WHERE code=:code AND is_active=1",['code'=>strtoupper($areaCode)],'El área no existe.');$areaId=$area['id'];}
+    $areaId=(int)$user['primary_area_id'];$areaCode=trim((string)($payload['area_code']??''));if(isSuperAdmin($pdo,(int)$user['id'])&&$areaCode!==''){$area=findOne($pdo,"SELECT id FROM areas WHERE code=:code AND is_active=1",['code'=>strtoupper($areaCode)],'El área no existe.');$areaId=(int)$area['id'];}
     $pdo->prepare("INSERT INTO warehouses (code,name,warehouse_type,area_id) VALUES (:code,:name,:type,:area)")->execute(['code'=>$code,'name'=>requiredString($payload,'warehouse_name','el nombre del almacén',120),'type'=>$type,'area'=>$areaId]);
     $id=(int)$pdo->lastInsertId();writeAudit($pdo,(int)$user['id'],'CREATE','warehouse',$id,['code'=>$code,'type'=>$type]);return ['id'=>$id,'code'=>$code];
 }
@@ -598,8 +599,9 @@ function createWarehouse(PDO $pdo, array $user, array $payload): array
 function createWarehouseLocation(PDO $pdo, array $user, array $payload): array
 {
     requireArea($pdo,$user,['ALMACEN']);
-    requirePermission($pdo,(int)$user['id'],'INVENTORY','CREATE');
-    $warehouse=findOne($pdo,"SELECT id FROM warehouses WHERE code=:code AND is_active=1",['code'=>masterCode($payload,'warehouse_code','el almacén',30)],'El almacén no existe.');
+    $warehouse=findOne($pdo,"SELECT id,warehouse_type FROM warehouses WHERE code=:code AND is_active=1",['code'=>masterCode($payload,'warehouse_code','el almacén',30)],'El almacén no existe.');
+    $module=['RAW_MATERIAL'=>'WAREHOUSE_RAW','PACKAGING'=>'WAREHOUSE_PACKAGING','SPARE_PARTS'=>'WAREHOUSE_SPARES','FINISHED_GOODS'=>'WAREHOUSE_FINISHED'][$warehouse['warehouse_type']]??'INVENTORY';
+    requireAnyPermissionV14($pdo,(int)$user['id'],[$module,'INVENTORY'],'CREATE');
     $code=masterCode($payload,'location_code','el código de ubicación',50);$types=['RECEIVING','QUALITY_HOLD','STORAGE','PICKING','PRODUCTION','SHIPPING','REJECTED','RETURNS'];$type=requiredString($payload,'location_type','el tipo de ubicación',30);if(!in_array($type,$types,true))failRequest('El tipo de ubicación no es válido.',422);
     if(safeScalar($pdo,"SELECT COUNT(*) FROM warehouse_locations WHERE warehouse_id=:warehouse AND code=:code",['warehouse'=>$warehouse['id'],'code'=>$code])>0)failRequest('La ubicación ya existe en ese almacén.',409);
     $blocked=(string)($payload['is_blocked']??'0')==='1'?1:0;
