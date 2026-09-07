@@ -1,4 +1,4 @@
-# Guía sencilla de módulos · Oleolab Almacenes 0.3
+# Guía sencilla de módulos · Oleolab Almacenes 0.3.1
 
 ## Regla principal de acceso
 

@@ -29,7 +29,7 @@ Navegador -> frontend estático -> API PHP 8.3 -> MySQL 8 en localhost
 - Consultas preparadas, política CSP, restricción de origen y carpetas sin listado.
 - Movimientos contabilizados inmutables; las correcciones se realizan con reversas.
 
-## Funciones de la versión 0.3
+## Funciones de la versión 0.3.1
 
 - Paneles diferenciados de Almacenes, Compras, Calidad y Mantenimiento.
 - Administración exclusiva del único superadministrador, roles personalizados y módulos seleccionados con casillas.

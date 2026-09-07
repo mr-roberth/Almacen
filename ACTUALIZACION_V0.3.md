@@ -1,4 +1,4 @@
-# Actualización del ambiente de pruebas a la versión 0.3
+# Actualización del ambiente de pruebas a la versión 0.3.1
 
 Esta actualización conserva la conexión actual, los usuarios, los movimientos y las existencias. El paquete no incluye `api/config.local.php` ni fotografías guardadas en `storage`.
 
@@ -9,11 +9,13 @@ Esta actualización conserva la conexión actual, los usuarios, los movimientos 
 3. Sin cambiar de base, abra **Importar** y cargue únicamente `database/migration_v1_4.sql`. Debe aparecer el mensaje verde de importación exitosa. No vuelva a importar `schema.sql` ni `migration_v1_3.sql` si ya los aplicó.
 4. En cPanel abra `public_html/Apps/Almacen` y descargue una copia de `api/config.local.php`. No lo borre ni lo reemplace durante la extracción.
 5. Conserve la carpeta `storage`, porque contiene las evidencias privadas de Mantenimiento.
-6. Cargue `oleolab-almacen-cpanel-v0.3.0.zip` en esa misma carpeta. Selecciónelo, pulse **Extraer** y acepte reemplazar archivos existentes. El mensaje `inflating` significa que la extracción terminó correctamente.
+6. Cargue `oleolab-almacen-cpanel-v0.3.1.zip` en esa misma carpeta. Selecciónelo, pulse **Extraer** y acepte reemplazar archivos existentes. El mensaje `inflating` significa que la extracción terminó correctamente.
 7. Compruebe que estén estos archivos nuevos: `api/v14.php`, `database/migration_v1_4.sql` y `ACTUALIZACION_V0.3.md`.
 8. Confirme permisos recomendados: carpetas `755`, archivos `644`, `api/config.local.php` `600` y `storage/private/maintenance` `750` o `755` según admita el hosting.
 9. Abra `https://ci4kash.com/Apps/Almacen/api/index.php?action=health`. La respuesta debe incluir `"status":"ok"` y `"database":"connected"`.
 10. Abra `https://ci4kash.com/Apps/Almacen/`, cierre la sesión anterior si sigue abierta, presione `Ctrl+F5` e inicie sesión otra vez.
+
+La versión 0.3.1 impide que el navegador conserve un `index.html` anterior. Esto evita errores como `Cannot read properties of null (reading 'reset')` después de actualizar archivos.
 
 ## Prueba mínima recomendada
 
