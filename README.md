@@ -17,6 +17,7 @@ Navegador -> frontend estático -> API PHP 8.3 -> MySQL 8 en localhost
 - `database/migration_v1_3.sql`: actualización aditiva para una base v1.2 ya instalada.
 - `database/migration_v1_4.sql`: módulos separados, WID, Calidad analítica, Envasado y Extracción trazable.
 - `database/migration_v1_5.sql`: almacenes base oficiales, zonas claras y ejemplos únicamente como sugerencias.
+- `database/migration_v1_6.sql`: catálogo PT/CME, listas de materiales y edición de usuarios con teléfono.
 - `assets/xlsx.full.min.js`: lector local de Excel utilizado por el importador de Forecast.
 - `private-tools/create_admin.php`: creación por consola del único superadministrador.
 - `INSTALACION.md`: publicación paso a paso en cPanel.
@@ -30,7 +31,7 @@ Navegador -> frontend estático -> API PHP 8.3 -> MySQL 8 en localhost
 - Consultas preparadas, política CSP, restricción de origen y carpetas sin listado.
 - Movimientos contabilizados inmutables; las correcciones se realizan con reversas.
 
-## Funciones de la versión 0.3.2
+## Funciones de la versión 0.4.0
 
 - Paneles diferenciados de Almacenes, Compras, Calidad y Mantenimiento.
 - Administración exclusiva del único superadministrador, roles personalizados y módulos seleccionados con casillas.
@@ -46,8 +47,11 @@ Navegador -> frontend estático -> API PHP 8.3 -> MySQL 8 en localhost
 - Dictámenes parciales, resultados analíticos de aguacate y extracción, y maestro de lotes exportable.
 - Órdenes de Envasado, consumo automático por lista de materiales, merma y entrada trazable a producto terminado.
 - Extracción con lote de aguacate de origen, meta de contenedores por hora y genealogía del lote resultante.
+- Importación oficial de 195 productos terminados, 432 materiales de empaque y 1,325 relaciones de consumo.
+- Vista previa de materiales necesarios, disponibles y faltantes antes de crear una orden de producción.
+- Edición de usuarios, teléfono, estado, contraseña y módulos desde la Administración protegida.
 
-La instalación, actualización y operación se explican en `INSTALACION.md`, `ACTUALIZACION_V0.3.md` y `GUIA_RAPIDA_MODULOS.md`.
+La instalación, actualización y operación se explican en `INSTALACION.md`, `ACTUALIZACION_V0.4.md` y `GUIA_RAPIDA_MODULOS.md`.
 
 ## Repositorios
 

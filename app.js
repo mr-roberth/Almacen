@@ -29,7 +29,7 @@
   const OPERATION_META = {
     appointment:['COMPRAS Y LOGÍSTICA','Programar llegada'],receipt:['ALMACÉN','Registrar recepción'],movement:['INVENTARIO','Registrar movimiento'],
     quality:['CALIDAD','Solicitar inspección'],qualityDecision:['CALIDAD','Registrar dictamen'],count:['ALMACÉN','Programar conteo'],return:['DEVOLUCIONES','Registrar devolución'],
-    user:['USUARIOS','Registrar usuario'],supplier:['COMPRAS','Registrar proveedor'],origin:['COMPRAS','Registrar origen'],warehouse:['ALMACENES','Registrar almacén'],location:['ALMACENES','Registrar ubicación'],warehouseModule:['ALMACENES','Registrar almacén operativo'],locationModule:['ALMACENES','Registrar zona física'],item:['CATÁLOGOS','Registrar producto o material'],itemRaw:['ALMACÉN DE MATERIA PRIMA','Registrar materia prima o aceite'],itemPackaging:['ALMACÉN DE MATERIALES DE EMPAQUE','Registrar material de empaque'],itemSpare:['ALMACÉN DE REFACCIONES','Registrar refacción'],itemFinished:['ALMACÉN DE PRODUCTO TERMINADO','Registrar producto terminado'],customer:['VENTAS','Registrar cliente'],bom:['PLANEACIÓN DE MATERIALES','Agregar componente a una lista de materiales'],
+    user:['USUARIOS','Registrar usuario'],userEdit:['USUARIOS','Configurar usuario y accesos'],supplier:['COMPRAS','Registrar proveedor'],origin:['COMPRAS','Registrar origen'],warehouse:['ALMACENES','Registrar almacén'],location:['ALMACENES','Registrar ubicación'],warehouseModule:['ALMACENES','Registrar almacén operativo'],locationModule:['ALMACENES','Registrar zona física'],item:['CATÁLOGOS','Registrar producto o material'],itemRaw:['ALMACÉN DE MATERIA PRIMA','Registrar materia prima o aceite'],itemPackaging:['ALMACÉN DE MATERIALES DE EMPAQUE','Registrar material de empaque'],itemSpare:['ALMACÉN DE REFACCIONES','Registrar refacción'],itemFinished:['ALMACÉN DE PRODUCTO TERMINADO','Registrar producto terminado'],customer:['VENTAS','Registrar cliente'],bom:['PLANEACIÓN DE MATERIALES','Agregar componente a una lista de materiales'],
     area:['ADMINISTRACIÓN','Registrar área'],role:['ADMINISTRACIÓN','Registrar rol'],technicianV14:['MANTENIMIENTO','Registrar técnico'],forecastImport:['PLANEACIÓN','Importar Forecast desde Excel'],maintenanceRequest:['MANTENIMIENTO','Registrar solicitud'],maintenanceAssignment:['MANTENIMIENTO','Asignar técnicos'],maintenanceUpdate:['MANTENIMIENTO','Responder tarea'],auditSchedule:['AUDITORÍA DE INVENTARIO','Programar días de auditoría'],
     appointmentV14:['COMPRAS','Programar llegada y WID'],receiptV14:['ALMACÉN','Confirmar recepción'],productionOrder:['ENVASADO','Crear orden de producción'],productionCompletion:['PRODUCTO TERMINADO','Registrar producto terminado'],extractionBatch:['EXTRACCIÓN','Ingresar lote a extracción'],qualityDecisionV14:['CALIDAD','Capturar resultados y dictamen'],qualityCancel:['CALIDAD','Cancelar solicitud']
   };
@@ -420,7 +420,7 @@
     if (!state.data.user.isSuperAdmin) return navigate('dashboard', true);
     const rows=filterRows(state.data.users||[],['name','email','area','role','modules','status']);
     $('#view').innerHTML=`<div class="section-head"><div><h2>Administración del sistema</h2><p class="muted">Único lugar para crear usuarios, roles y áreas, y decidir qué módulos puede abrir cada persona.</p></div><div class="actions"><button class="btn ghost" data-open-operation="area">Nueva área</button><button class="btn ghost" data-open-operation="role">Nuevo rol</button><button class="btn primary" data-open-operation="user">Nuevo usuario</button></div></div>
-      <section class="card">${table(['Usuario','Área','Rol','Módulos asignados','Estado'],rows.map(x=>[cell(x.name,x.email),x.area,x.role,x.modules,badge(x.status)]),'Todavía no hay usuarios registrados.')}</section>
+      <section class="card">${table(['Usuario','Área','Rol','Módulos asignados','Estado',''],rows.map(x=>[cell(x.name,[x.email,x.phone].filter(Boolean).join(' · ')),x.area,x.role,x.modules,badge(x.status),trusted(`<button class="btn ghost small" data-user-edit="${h(x.id)}">Configurar</button>`)]),'Todavía no hay usuarios registrados.')}</section>
       <section class="card card-pad page-gap"><h3>Regla de seguridad</h3><p>Solamente la cuenta Administrador del sistema puede entrar a esta ventana. Los permisos también se validan en el servidor; ocultar una opción en pantalla no es la única protección.</p></section>`;
   }
 
@@ -524,7 +524,8 @@
     const rows = filterRows(state.data.mrp, ['item', 'sku', 'needDate', 'action', 'status']);
     const shortages = rows.filter(x => Number(x.shortage) > 0);
     const coveragePct = rows.length ? Math.round((rows.length - shortages.length) / rows.length * 100) : 0;
-    $('#view').innerHTML = sectionHeader('Necesidades calculadas', 'Se recalculan automáticamente al importar un Forecast, cambiar una lista de materiales o afectar existencias.', null, null, true) + `
+    const canRecalculate=state.data.user.isSuperAdmin||can('MRP','CREATE')||can('MRP','UPDATE')||can('MRP','POST');
+    $('#view').innerHTML = `<div class="section-head"><div><h2>Necesidades calculadas</h2><p class="muted">Se recalculan automáticamente al importar un Forecast, cambiar una lista de materiales o afectar existencias.</p></div>${canRecalculate?'<button class="btn primary" data-recalculate-mrp>Recalcular necesidades</button>':''}</div>` + `
       <div class="metric-grid">${metric('Necesidades', n(rows.length), '∑', 'Último cálculo completado')}${metric('Faltantes', n(shortages.length), '!', 'Materiales con necesidad neta', shortages.length ? 'danger' : '')}${metric('Cantidad faltante', n(shortages.reduce((sum, x) => sum + Number(x.shortage || 0), 0)), '▤', 'Consultar unidades por renglón')}${metric('Cobertura de renglones', `${n(coveragePct)}%`, '✓', 'Sin faltante neto', coveragePct < 75 ? 'warning' : '')}</div>
       <section class="card">${table(['Material','Requerido','Disponible','Entradas','Faltante','Fecha necesidad','Acción sugerida','Estado'], rows.map(x => [cell(x.item, `Código: ${x.sku}`), numCell(x.required), numCell(x.available), numCell(x.incoming), numCell(x.shortage, x.shortage > 0 ? 'negative' : 'positive'), dateFmt(x.needDate), x.action, badge(x.status)]), 'Importa un Forecast y registra la lista de materiales de cada producto terminado.')}</section>`;
   }
@@ -629,6 +630,13 @@
       bindCaptureLineActions();
       filterCaptureLocations();
     }
+  }
+
+  async function recalculateMrp() {
+    setLoading(true,'Recalculando necesidades…');
+    try{const result=await api('createOperation',{operation_type:'mrpRecalculate',idempotency_key:crypto.randomUUID()});state.data=await api('bootstrap');toast(result.mrpRunsUpdated?`Necesidades actualizadas para ${n(result.mrpRunsUpdated)} versión(es) del Forecast.`:'No existe un Forecast vigente para recalcular.');renderPage();}
+    catch(error){toast(error.message,true);}
+    finally{setLoading(false);}
   }
 
   function filterCaptureLocations() {
@@ -751,9 +759,9 @@
   function renderUsers() {
     const rows = filterRows(state.data.users, ['name', 'email', 'area', 'role', 'modules', 'status']);
     const adminActions=state.data.user.isSuperAdmin?'<button class="btn ghost" data-open-operation="area">Nueva área</button><button class="btn ghost" data-open-operation="role">Nuevo rol</button>':'';
-    $('#view').innerHTML = `<div class="section-head"><div><h2>Usuarios y accesos</h2><p class="muted">El administrador del sistema gestiona todas las áreas; cada jefe administra únicamente a su propio equipo.</p></div><div class="actions">${adminActions}<button class="btn primary" data-open-operation="user">Nuevo usuario</button></div></div>` + `
-      <section class="card">${table(['Usuario','Área','Rol','Módulos','Estado',''], rows.map(x => [cell(x.name, x.email), x.area, x.role, x.modules, badge(x.status), trusted('<button class="btn ghost small" data-user-edit>Configurar</button>')]), 'No hay usuarios con ese criterio.')}</section>
-      <section class="card card-pad page-gap"><h3>Separación por área</h3><p>Las casillas seleccionadas determinan las ventanas visibles. Un jefe de área no puede consultar ni asignar módulos que no le pertenecen.</p></section>`;
+    $('#view').innerHTML = `<div class="section-head"><div><h2>Usuarios y accesos</h2><p class="muted">Sólo el Administrador del sistema puede crear o modificar cuentas y asignar sus módulos.</p></div><div class="actions">${adminActions}<button class="btn primary" data-open-operation="user">Nuevo usuario</button></div></div>` + `
+      <section class="card">${table(['Usuario','Área','Rol','Módulos','Estado',''], rows.map(x => [cell(x.name, x.email), x.area, x.role, x.modules, badge(x.status), trusted(`<button class="btn ghost small" data-user-edit="${h(x.id)}">Configurar</button>`)]), 'No hay usuarios con ese criterio.')}</section>
+      <section class="card card-pad page-gap"><h3>Separación por área</h3><p>Las casillas seleccionadas determinan las ventanas visibles. La autorización siempre se valida también en el servidor.</p></section>`;
   }
 
   function renderAudit() {
@@ -804,7 +812,8 @@
     $$('[data-export]').forEach(button => button.addEventListener('click', exportCurrentPage));
     $$('[data-executive-report]').forEach(button => button.addEventListener('click', exportExecutiveReport));
     $$('[data-audit-report]').forEach(button => button.addEventListener('click', exportInventoryAuditReport));
-    $$('[data-user-edit]').forEach(button => button.addEventListener('click', () => toast('Para cambiar accesos, cree una nueva asignación desde el administrador.')));
+    $$('[data-user-edit]').forEach(button => button.addEventListener('click', () => {const selected=(state.data.users||[]).find(user=>String(user.id)===String(button.dataset.userEdit));if(!selected)return toast('No se encontró el usuario.',true);openOperation('userEdit',{user:selected});}));
+    $$('[data-recalculate-mrp]').forEach(button=>button.addEventListener('click',recalculateMrp));
     $$('[data-stocktake-type]').forEach(button=>button.addEventListener('click',()=>{state.inventoryWarehouseType=button.dataset.stocktakeType||'';state.inventoryCaptureMode=button.dataset.auditMode==='audit'?'audit':'initial';state.inventoryCaptureLines=[];navigate('warehouseAudits',true);}));
     $$('[data-quality-decision]').forEach(button=>button.addEventListener('click',()=>openOperation('qualityDecisionV14',{requestId:Number(button.dataset.qualityDecision)})));
     $$('[data-quality-cancel]').forEach(button=>button.addEventListener('click',()=>openOperation('qualityCancel',{requestId:Number(button.dataset.qualityCancel)})));
@@ -839,7 +848,7 @@
 
   function renderOperationFields() {
     const type=$('#operation-type').value;const lookups=state.data?.lookups||{};let markup=operationFields[type]||'';
-    if(type==='user') markup=userFields(lookups);
+    if(type==='user'||type==='userEdit') markup=userFields(lookups,type==='userEdit'?state.operationContext?.user:null);
     if(['item','itemRaw','itemPackaging','itemSpare','itemFinished'].includes(type)) markup=itemFields(lookups,type);
     if(type==='warehouseModule') markup=warehouseModuleFields(state.operationContext?.warehouseType);
     if(type==='locationModule') markup=locationModuleFields(lookups,state.operationContext?.warehouseType);
@@ -864,12 +873,16 @@
     bindOperationDependencies(type);
   }
 
-  function userFields(lookups) {
-    return `<label>Nombre completo<input name="display_name" required maxlength="160"></label><label>Correo electrónico<input name="email" type="email" required maxlength="190"></label>
-      <label>Área<select name="area_id" required><option value="">Selecciona el área</option>${(lookups.areas||[]).map(x=>`<option value="${h(x.id)}">${h(x.name)}</option>`).join('')}</select></label>
-      <label>Rol<select name="role_code" required><option value="">Selecciona el rol</option>${(lookups.roles||[]).map(x=>`<option value="${h(x.code)}">${h(x.name)}</option>`).join('')}</select></label>
-      <fieldset class="span-2 check-field"><legend>Ventanas y módulos autorizados</legend><p>Marca únicamente las ventanas que esta persona debe utilizar.</p><div class="check-grid">${moduleChecks(lookups.modules||[])}</div></fieldset>
-      <label class="span-2">Contraseña inicial segura<input name="password" type="password" minlength="12" autocomplete="new-password" required></label>`;
+  function userFields(lookups,user=null) {
+    const editing=Boolean(user),protectedAdmin=Number(user?.isSystemAdmin)===1;
+    const selectedModules=String(user?.moduleCodes||'').split(',').filter(Boolean);
+    const accessFields=protectedAdmin?'<div class="span-2 notice"><strong>Cuenta protegida</strong><p>Es el único administrador del sistema. Puedes actualizar sus datos y contraseña, pero no quitarle el acceso total ni desactivarla.</p></div>':`<label>Área<select name="area_id" required><option value="">Selecciona el área</option>${(lookups.areas||[]).map(x=>`<option value="${h(x.id)}" ${String(x.id)===String(user?.primaryAreaId||'')?'selected':''}>${h(x.name)}</option>`).join('')}</select></label>
+      <label>Rol<select name="role_code" required><option value="">Selecciona el rol</option>${(lookups.roles||[]).map(x=>`<option value="${h(x.code)}" ${String(x.code)===String(user?.roleCode||'')?'selected':''}>${h(x.name)}</option>`).join('')}</select></label>
+      <fieldset class="span-2 check-field"><legend>Ventanas y módulos autorizados</legend><p>Marca únicamente las ventanas que esta persona debe utilizar.</p><div class="check-grid">${moduleChecks(lookups.modules||[],selectedModules)}</div></fieldset>`;
+    return `${editing?`<input name="user_id" type="hidden" value="${h(user.id)}">`:''}<label>Nombre completo<input name="display_name" required maxlength="160" value="${h(user?.name||'')}"></label><label>Correo electrónico<input name="email" type="email" required maxlength="190" value="${h(user?.email||'')}"></label>
+      <label>Teléfono<input name="phone_number" type="tel" maxlength="40" value="${h(user?.phone||'')}" placeholder="Ej. 443 000 0000"></label>${editing?`<label>Estado<select name="status" required><option value="ACTIVE" ${user.status==='ACTIVE'?'selected':''}>Activo</option>${protectedAdmin?'':`<option value="DISABLED" ${user.status==='DISABLED'?'selected':''}>Desactivado</option>`}</select></label>`:'<div></div>'}
+      ${accessFields}
+      <label class="span-2">${editing?'Nueva contraseña (opcional)':'Contraseña inicial segura'}<input name="password" type="password" minlength="12" autocomplete="new-password" ${editing?'':'required'}><small>${editing?'Déjala vacía para conservar la contraseña actual.':'Mínimo 12 caracteres.'}</small></label>`;
   }
 
   function itemFields(lookups, variant='item') {
@@ -917,7 +930,7 @@
   }
 
   function productionOrderFields(lookups) {
-    return `<label class="span-2">Lista de materiales<select name="bom_version_id" required><option value="">Selecciona el producto y su lista</option>${(lookups.bomVersions||[]).map(x=>`<option value="${h(x.id)}">${h(x.output_name)} · ${h(x.output_sku)} · ${h(x.bom_code)} versión ${h(x.version_no)}</option>`).join('')}</select></label><label>Cantidad a fabricar<input name="planned_qty" type="number" min="0.000001" step="0.001" required></label><label>Cliente opcional<select name="customer_id"><option value="">Sin cliente específico</option>${(lookups.customers||[]).map(x=>`<option value="${h(x.id)}">${h(x.name)}</option>`).join('')}</select></label><label>Inicio planeado<input name="planned_start" type="datetime-local" required></label><label>Fin planeado<input name="planned_end" type="datetime-local" required></label>`;
+    return `<label class="span-2">Lista de materiales<select id="production-bom" name="bom_version_id" required><option value="">Selecciona el producto y su lista</option>${(lookups.bomVersions||[]).map(x=>`<option value="${h(x.id)}">${h(x.output_name)} · ${h(x.output_sku)} · ${h(x.bom_code)} versión ${h(x.version_no)}</option>`).join('')}</select></label><label>Cantidad a fabricar<input id="production-quantity" name="planned_qty" type="number" min="0.000001" step="0.001" required></label><label>Cliente opcional<select name="customer_id"><option value="">Sin cliente específico</option>${(lookups.customers||[]).map(x=>`<option value="${h(x.id)}">${h(x.name)}</option>`).join('')}</select></label><div id="bom-material-check" class="span-2 import-preview"><strong>Selecciona producto y cantidad</strong><span>Verás cada material requerido, la existencia disponible y el faltante antes de crear la orden.</span></div><label>Inicio planeado<input name="planned_start" type="datetime-local" required></label><label>Fin planeado<input name="planned_end" type="datetime-local" required></label>`;
   }
 
   function productionCompletionFields(lookups,orderId) {
@@ -949,6 +962,7 @@
     if(type==='extractionBatch'){$('#extraction-source')?.addEventListener('change',()=>{$('#extraction-source-location').value=$('#extraction-source').selectedOptions[0]?.dataset.location||'';});$('#extraction-source')?.dispatchEvent(new Event('change'));}
     if(type==='qualityDecisionV14'){$('#quality-request')?.addEventListener('change',configureQualityForm);$('#quality-disposition')?.addEventListener('change',configureQualityQuantities);$('[name="oil_obtained_qty"]')?.addEventListener('input',configureQualityQuantities);configureQualityForm();}
     if(type==='productionCompletion'){$('#completion-order')?.addEventListener('change',renderCompletionWaste);renderCompletionWaste();}
+    if(type==='productionOrder'){$('#production-bom')?.addEventListener('change',renderProductionMaterialCheck);$('#production-quantity')?.addEventListener('input',renderProductionMaterialCheck);renderProductionMaterialCheck();}
     if(type==='locationModule'){$('#location-type')?.addEventListener('change',configureLocationType);configureLocationType();}
   }
 
@@ -959,9 +973,11 @@
   function filterReceiptLocations(){const option=$('#receipt-line')?.selectedOptions[0],warehouse=option?.dataset.warehouse||'';$$('#receipt-location option[data-warehouse]').forEach(x=>x.hidden=x.dataset.warehouse!==warehouse);if($('#receipt-location')?.selectedOptions[0]?.hidden)$('#receipt-location').value='';if(option?.dataset.pending)$('#receipt-quantity').value=option.dataset.pending;}
   function configureQualityForm(){const option=$('#quality-request')?.selectedOptions[0],type=option?.dataset.requestType||'',received=Number(option?.dataset.received||0),warehouse=option?.dataset.warehouse||'';$('#quality-raw-fields')?.classList.toggle('hidden',type!=='INBOUND_FRUIT');$('#quality-extraction-fields')?.classList.toggle('hidden',type!=='IN_PROCESS');$('#quality-quantity-help').textContent=type==='IN_PROCESS'?'Captura Aceite obtenido; liberada + rechazada deben coincidir con ese resultado.':`Cantidad recibida o producida: ${n(received)} ${option?.dataset.uom||''}`;$$('#quality-accepted-location option[data-warehouse]').forEach(x=>x.hidden=type==='IN_PROCESS'?!['RAW_MATERIAL','PROCESS'].includes(x.dataset.warehouseType):x.dataset.warehouse!==warehouse);$$('#quality-rejected-location option[data-warehouse]').forEach(x=>x.hidden=type==='IN_PROCESS'?!['RAW_MATERIAL','PROCESS'].includes(x.dataset.warehouseType):x.dataset.warehouse!==warehouse);if($('#quality-accepted-location')?.selectedOptions[0]?.hidden)$('#quality-accepted-location').value='';if($('#quality-rejected-location')?.selectedOptions[0]?.hidden)$('#quality-rejected-location').value='';configureQualityQuantities();}
   function configureQualityQuantities(){const option=$('#quality-request')?.selectedOptions[0],type=option?.dataset.requestType||'',received=type==='IN_PROCESS'?Number($('[name="oil_obtained_qty"]')?.value||0):Number(option?.dataset.received||0),disposition=$('#quality-disposition')?.value||'APPROVED';$('#quality-accepted').value=disposition==='REJECTED'?0:(received||'');$('#quality-rejected').value=disposition==='REJECTED'?(received||''):0;}
-  function renderCompletionWaste(){const orderId=Number($('#completion-order')?.value||0),order=(state.data.lookups?.productionOrdersV14||[]).find(x=>Number(x.id)===orderId),host=$('#completion-waste-lines');if(!host)return;const components=(state.data.bomCatalog||[]).filter(x=>Number(x.versionId)===Number(order?.bom_version_id));host.innerHTML=components.map(x=>`<label>${h(x.component)}<input name="waste_${h(x.componentId)}" data-waste-item="${h(x.componentId)}" type="number" min="0" step="0.001" value="0"><small>${h(x.componentUom)}</small></label>`).join('')||'<p>Selecciona una orden con lista de materiales.</p>';}
+  function renderProductionMaterialCheck(){const host=$('#bom-material-check');if(!host)return;const versionId=Number($('#production-bom')?.value||0),quantity=Number($('#production-quantity')?.value||0);if(!versionId||!Number.isFinite(quantity)||quantity<=0){host.innerHTML='<strong>Selecciona producto y cantidad</strong><span>Verás cada material requerido, la existencia disponible y el faltante antes de crear la orden.</span>';return;}const components=(state.data.bomCatalog||[]).filter(x=>Number(x.versionId)===versionId&&x.componentItemId);const availability=new Map((state.data.bomAvailability||[]).map(x=>[Number(x.itemId),Number(x.availableQty||0)]));const results=components.map(component=>{const required=quantity/Number(component.outputQty||1)*Number(component.componentQty||0)*(1+Number(component.scrapPct||0)/100),available=availability.get(Number(component.componentItemId))||0,missing=Math.max(0,required-available);return {component,required,available,missing};});const rows=results.map(({component,required,available,missing})=>[cell(component.component,component.componentSku),`${n(required)} ${h(component.componentUom)}`,`${n(available)} ${h(component.componentUom)}`,missing>0?trusted(`<span class="negative">Faltan ${n(missing)}</span>`):trusted('<span class="positive">Completo</span>')]);const missingCount=results.filter(result=>result.missing>0).length;host.innerHTML=`<strong>${missingCount?`${n(missingCount)} material(es) con faltante`:'Materiales suficientes para crear la orden'}</strong><span>El servidor volverá a validar las cantidades al guardar y al registrar el producto terminado.</span>${table(['Material','Necesario','Disponible','Resultado'],rows,'Esta lista no tiene componentes.')}`;}
 
-  function moduleChecks(modules) { return modules.map(x=>`<label class="check-card"><input type="checkbox" name="module_codes" value="${h(x.code)}"><span>✓</span><strong>${h(x.name)}</strong></label>`).join(''); }
+  function renderCompletionWaste(){const orderId=Number($('#completion-order')?.value||0),order=(state.data.lookups?.productionOrdersV14||[]).find(x=>Number(x.id)===orderId),host=$('#completion-waste-lines');if(!host)return;const components=(state.data.bomCatalog||[]).filter(x=>Number(x.versionId)===Number(order?.bom_version_id));host.innerHTML=components.map(x=>`<label>${h(x.component)}<input name="waste_${h(x.componentItemId)}" data-waste-item="${h(x.componentItemId)}" type="number" min="0" step="0.001" value="0"><small>${h(x.componentUom)}</small></label>`).join('')||'<p>Selecciona una orden con lista de materiales.</p>';}
+
+  function moduleChecks(modules,selected=[]) { return modules.map(x=>`<label class="check-card"><input type="checkbox" name="module_codes" value="${h(x.code)}" ${selected.includes(String(x.code))?'checked':''}><span>✓</span><strong>${h(x.name)}</strong></label>`).join(''); }
 
   function technicianFields(lookups) {
     return `<label class="span-2">Usuario del área de Mantenimiento<select name="technician_user_id" required><option value="">Selecciona un usuario</option>${(lookups.maintenanceUsers||[]).map(x=>`<option value="${h(x.id)}">${h(x.name)} · ${h(x.email)}</option>`).join('')}</select><small>Las cuentas únicamente se crean desde Administración del sistema.</small></label><label>Especialidades<input name="specialties" maxlength="500" placeholder="Ej. Electricidad, mecánica, refrigeración"></label><label>Teléfono<input name="phone" maxlength="40"></label>`;
@@ -1020,7 +1036,8 @@
       form.close?.();
       $('#operation-dialog').close();
       const missingLists=operationResult?.mrp?.missingBillsOfMaterial||[];
-      toast(state.demo?'Operación simulada; no se modificó la base de datos.':missingLists.length?`Forecast guardado. Faltan listas de materiales para ${missingLists.length} producto(s).`:'Operación guardada correctamente.');
+      const productionShortages=operationResult?.shortages||[];
+      toast(state.demo?'Operación simulada; no se modificó la base de datos.':missingLists.length?`Forecast guardado. Faltan listas de materiales para ${missingLists.length} producto(s).`:type==='productionOrder'&&productionShortages.length?`Orden creada con ${productionShortages.length} material(es) faltante(s). Quedó en revisión de materiales.`:'Operación guardada correctamente.');
       renderPage();
     } catch (error) { toast(error.message, true); }
     finally { submit.disabled = false; submit.textContent = submit.dataset.idleLabel; }

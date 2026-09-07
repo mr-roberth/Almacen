@@ -219,6 +219,9 @@ input:focus, select:focus, textarea:focus { border-color: var(--green); box-shad
 .capture-lines { margin-top: 18px; border: 1px solid var(--line); border-radius: 13px; overflow: hidden; }
 .import-preview { display: grid; gap: 4px; border: 1px dashed #9dbcb0; background: var(--green-soft); padding: 15px; border-radius: 12px; }
 .import-preview span { color: var(--muted); font-size: .82rem; }
+.import-preview .table-wrap { margin-top: 10px; background: #fff; border-radius: 10px; }
+.notice { border: 1px solid #b7d6c9; background: var(--green-soft); border-radius: 12px; padding: 14px; }
+.notice p { color: var(--muted); margin: 5px 0 0; }
 .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 20px 0; }
 .detail { background: #f7faf8; border-radius: 11px; padding: 12px; }

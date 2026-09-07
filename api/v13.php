@@ -66,7 +66,27 @@ function buildUserList(PDO $pdo, array $user, bool $isAdmin): array
 {
     $where=$isAdmin?'':'WHERE u.primary_area_id=:area';
     $params=$isAdmin?[]:['area'=>$user['primary_area_id']];
-    return safeRows($pdo,"SELECT u.id,u.display_name AS name,u.email,COALESCE(a.name,'Sin área') AS area,COALESCE(GROUP_CONCAT(DISTINCT r.name ORDER BY r.id SEPARATOR ', '),'Sin rol') AS role,COALESCE(GROUP_CONCAT(DISTINCT CASE WHEN o.decision='ALLOW' AND p.action_code='VIEW' THEN m.name END ORDER BY m.sort_order SEPARATOR ', '),'Configurado por rol') AS modules,u.status FROM app_users u LEFT JOIN areas a ON a.id=u.primary_area_id LEFT JOIN user_roles ur ON ur.user_id=u.id AND ur.is_active=1 LEFT JOIN roles r ON r.id=ur.role_id LEFT JOIN user_permission_overrides o ON o.user_id=u.id LEFT JOIN permissions p ON p.id=o.permission_id LEFT JOIN app_modules m ON m.id=p.module_id {$where} GROUP BY u.id,u.display_name,u.email,a.name,u.status ORDER BY u.display_name",$params);
+    return safeRows($pdo,"SELECT
+        u.id,u.display_name AS name,u.email,u.phone_number AS phone,u.primary_area_id AS primaryAreaId,
+        COALESCE(a.name,'Sin área') AS area,
+        COALESCE((SELECT r.name FROM user_roles ur INNER JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=u.id AND ur.is_active=1 ORDER BY r.id LIMIT 1),'Sin rol') AS role,
+        COALESCE((SELECT r.code FROM user_roles ur INNER JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=u.id AND ur.is_active=1 ORDER BY r.id LIMIT 1),'') AS roleCode,
+        COALESCE((SELECT GROUP_CONCAT(DISTINCT m.name ORDER BY m.sort_order SEPARATOR ', ')
+          FROM app_modules m INNER JOIN permissions p ON p.module_id=m.id AND p.action_code='VIEW'
+          WHERE m.is_active=1
+            AND (EXISTS(SELECT 1 FROM user_roles ur INNER JOIN role_permissions rp ON rp.role_id=ur.role_id WHERE ur.user_id=u.id AND ur.is_active=1 AND rp.permission_id=p.id)
+              OR EXISTS(SELECT 1 FROM user_permission_overrides allow_override WHERE allow_override.user_id=u.id AND allow_override.permission_id=p.id AND allow_override.decision='ALLOW'))
+            AND NOT EXISTS(SELECT 1 FROM user_permission_overrides deny_override WHERE deny_override.user_id=u.id AND deny_override.permission_id=p.id AND deny_override.decision='DENY')),'Acceso total') AS modules,
+        COALESCE((SELECT GROUP_CONCAT(DISTINCT m.code ORDER BY m.sort_order SEPARATOR ',')
+          FROM app_modules m INNER JOIN permissions p ON p.module_id=m.id AND p.action_code='VIEW'
+          WHERE m.is_active=1
+            AND (EXISTS(SELECT 1 FROM user_roles ur INNER JOIN role_permissions rp ON rp.role_id=ur.role_id WHERE ur.user_id=u.id AND ur.is_active=1 AND rp.permission_id=p.id)
+              OR EXISTS(SELECT 1 FROM user_permission_overrides allow_override WHERE allow_override.user_id=u.id AND allow_override.permission_id=p.id AND allow_override.decision='ALLOW'))
+            AND NOT EXISTS(SELECT 1 FROM user_permission_overrides deny_override WHERE deny_override.user_id=u.id AND deny_override.permission_id=p.id AND deny_override.decision='DENY')),'') AS moduleCodes,
+        EXISTS(SELECT 1 FROM user_roles ur INNER JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=u.id AND ur.is_active=1 AND r.code='SUPER_ADMIN') AS isSystemAdmin,
+        u.status
+      FROM app_users u LEFT JOIN areas a ON a.id=u.primary_area_id {$where}
+      ORDER BY u.display_name",$params);
 }
 
 function buildAreaDashboard(PDO $pdo, array $area): array

@@ -1,8 +1,8 @@
-# Guía sencilla de módulos · Oleolab Almacenes 0.3.2
+# Guía sencilla de módulos · Oleolab Almacenes 0.4.0
 
 ## Regla principal de acceso
 
-Existe un solo **Administrador del sistema**. Es la única cuenta que puede abrir Administración y la bitácora global, crear usuarios, áreas y roles, y marcar con casillas los módulos de cada usuario. Un jefe de área administra la operación de su módulo, pero no crea cuentas ni puede entrar a la Administración global.
+Existe un solo **Administrador del sistema**. Es la única cuenta que puede abrir Administración y la bitácora global, crear o modificar usuarios, registrar su teléfono, área, rol, estado y módulos mediante casillas, y restablecer su contraseña. Un jefe de área administra la operación de su módulo, pero no crea cuentas ni puede entrar a la Administración global.
 
 ## Panel de mi área
 
@@ -48,11 +48,11 @@ El usuario selecciona el lote real de aguacate, la cantidad alimentada, el núme
 
 ## Envasado
 
-Crea y modifica listas de materiales por producto terminado. Cada componente se elige de catálogo y lleva cantidad y merma esperada. Al crear una orden, la aplicación compara la necesidad con las existencias disponibles y marca faltantes. La lista queda fijada en la orden para evitar consumir materiales de otra presentación.
+Crea y modifica listas de materiales por producto terminado. La versión 0.4.0 incorpora 195 listas autorizadas desde el archivo maestro; cada componente se elige de catálogo y lleva cantidad y merma esperada. Al crear una orden, la aplicación muestra inmediatamente lo necesario, disponible y faltante, y vuelve a validarlo al guardar. La lista queda fijada en la orden para evitar consumir materiales de otra presentación.
 
 ## Forecast y necesidades de materiales
 
-Forecast importa `.xlsx`, `.xls` o `.csv`, busca códigos de producto terminado y cantidades mensuales, conserva la primera versión como original y las siguientes como revisiones. El cálculo de necesidades explota las listas de materiales y muestra requerido, disponible, faltante y fecha. Un código que no existe en Producto terminado se reporta y no se importa silenciosamente.
+Forecast importa `.xlsx`, `.xls` o `.csv`, busca códigos de producto terminado y cantidades mensuales, conserva la primera versión como original y las siguientes como revisiones. El cálculo de necesidades explota las listas de materiales y muestra requerido, disponible, faltante y fecha; también puede ejecutarse manualmente con **Recalcular necesidades**. Un código que no existe en Producto terminado se reporta y no se importa silenciosamente.
 
 ## Mantenimiento
 

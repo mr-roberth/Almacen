@@ -300,6 +300,7 @@ function createOperation(PDO $pdo, array $user, array $payload, array $config): 
         'count' => createInventoryCount($pdo, $user, $payload),
         'return' => createCustomerReturn($pdo, $user, $payload),
         'user' => createUser($pdo, $user, $payload),
+        'userEdit' => updateUser($pdo, $user, $payload),
         'supplier' => createSupplier($pdo, $user, $payload),
         'origin' => createSupplierOrigin($pdo, $user, $payload),
         'warehouse' => createWarehouse($pdo, $user, $payload),
@@ -314,6 +315,7 @@ function createOperation(PDO $pdo, array $user, array $payload, array $config): 
         'physicalCount' => createPhysicalCount($pdo, $user, $payload),
         'auditSchedule' => createInventoryAuditSchedule($pdo, $user, $payload),
         'forecastImport' => importForecast($pdo, $user, $payload),
+        'mrpRecalculate' => recalculateMrpOnDemand($pdo, $user),
         'maintenanceRequest' => createMaintenanceWorkRequest($pdo, $user, $payload, $config),
         'maintenanceAssignment' => assignMaintenanceTechnicians($pdo, $user, $payload, $config),
         'maintenanceUpdate' => updateMaintenanceWork($pdo, $user, $payload, $config),
@@ -330,6 +332,20 @@ function createOperation(PDO $pdo, array $user, array $payload, array $config): 
     };
     if(in_array($type,['movement','receiptV14','qualityDecision','qualityDecisionV14','initialInventory','physicalCount','productionCompletion','extractionBatch'],true))$result['mrpRunsUpdated']=recalculateCurrentForecasts($pdo,(int)$user['id']);
     return $result;
+}
+
+function recalculateMrpOnDemand(PDO $pdo,array $user): array
+{
+    $userId=(int)$user['id'];
+    if(!isSuperAdmin($pdo,$userId)
+        && !userHasPermission($pdo,$userId,'MRP','CREATE')
+        && !userHasPermission($pdo,$userId,'MRP','UPDATE')
+        && !userHasPermission($pdo,$userId,'MRP','POST')){
+        failRequest('Tu rol puede consultar las necesidades, pero no recalcularlas.',403);
+    }
+    $updated=recalculateCurrentForecasts($pdo,$userId);
+    writeAudit($pdo,$userId,'UPDATE','mrp_run',null,['forecast_versions_recalculated'=>$updated],'Recálculo manual de necesidades');
+    return ['mrpRunsUpdated'=>$updated];
 }
 
 function createAppointment(PDO $pdo, array $user, array $payload): array
@@ -499,25 +515,83 @@ function createCustomerReturn(PDO $pdo, array $user, array $payload): array
 
 function createUser(PDO $pdo, array $user, array $payload): array
 {
-    $isAdmin=isSuperAdmin($pdo,(int)$user['id']);
-    if (!$isAdmin) failRequest('Solo el administrador del sistema puede crear usuarios y asignar accesos.',403);
+    if (!isSuperAdmin($pdo,(int)$user['id'])) failRequest('Solo el administrador del sistema puede crear usuarios y asignar accesos.',403);
     $email=mb_strtolower(requiredString($payload,'email','el correo',190));
     if (!filter_var($email,FILTER_VALIDATE_EMAIL)) failRequest('El correo no es válido.',422);
     $password=(string)($payload['password']??'');
     if (mb_strlen($password)<12) failRequest('La contraseña debe tener al menos 12 caracteres.',422);
     if (safeScalar($pdo,"SELECT COUNT(*) FROM app_users WHERE email=:email",['email'=>$email])>0) failRequest('Ya existe un usuario con ese correo.',409);
+    $access=userAccessSelection($pdo,$payload);
+    $algorithm=defined('PASSWORD_ARGON2ID')?PASSWORD_ARGON2ID:PASSWORD_BCRYPT;
+    $pdo->beginTransaction();
+    try{
+        $insert=$pdo->prepare("INSERT INTO app_users (primary_area_id,email,display_name,phone_number,password_hash,status,must_change_password) VALUES (:area,:email,:name,:phone,:hash,'ACTIVE',0)");
+        $insert->execute(['area'=>$access['area']['id'],'email'=>$email,'name'=>requiredString($payload,'display_name','el nombre',160),'phone'=>optionalString($payload,'phone_number',40),'hash'=>password_hash($password,$algorithm)]);
+        $newUserId=(int)$pdo->lastInsertId();
+        replaceUserAccess($pdo,$newUserId,(int)$user['id'],$access);
+        syncMaintenanceTechnician($pdo,$newUserId,(int)$user['id'],$access,$payload);
+        writeAudit($pdo,(int)$user['id'],'CREATE','app_user',$newUserId,['email'=>$email,'role'=>$access['roleCode'],'modules'=>$access['moduleCodes']]);
+        $pdo->commit();
+        return ['id'=>$newUserId,'email'=>$email];
+    }catch(Throwable $error){
+        if($pdo->inTransaction())$pdo->rollBack();
+        throw $error;
+    }
+}
+
+function updateUser(PDO $pdo, array $user, array $payload): array
+{
+    if(!isSuperAdmin($pdo,(int)$user['id']))failRequest('Solo el administrador del sistema puede modificar usuarios y accesos.',403);
+    $targetId=(int)($payload['user_id']??0);
+    $target=findOne($pdo,"SELECT u.id,u.email,EXISTS(SELECT 1 FROM user_roles ur INNER JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=u.id AND ur.is_active=1 AND r.code='SUPER_ADMIN') AS is_super_admin FROM app_users u WHERE u.id=:id",['id'=>$targetId],'El usuario no existe.');
+    $email=mb_strtolower(requiredString($payload,'email','el correo',190));
+    if(!filter_var($email,FILTER_VALIDATE_EMAIL))failRequest('El correo no es válido.',422);
+    if(safeScalar($pdo,"SELECT COUNT(*) FROM app_users WHERE email=:email AND id<>:id",['email'=>$email,'id'=>$targetId])>0)failRequest('Ya existe otro usuario con ese correo.',409);
+    $status=strtoupper(trim((string)($payload['status']??'ACTIVE')));
+    if(!in_array($status,['ACTIVE','DISABLED'],true))failRequest('El estado del usuario no es válido.',422);
+    $password=(string)($payload['password']??'');
+    if($password!==''&&mb_strlen($password)<12)failRequest('La nueva contraseña debe tener al menos 12 caracteres.',422);
+    $isProtected=(bool)$target['is_super_admin'];
+    if($isProtected&&$status!=='ACTIVE')failRequest('La cuenta única del administrador del sistema no se puede desactivar.',409);
+    $access=$isProtected?null:userAccessSelection($pdo,$payload);
+    $algorithm=defined('PASSWORD_ARGON2ID')?PASSWORD_ARGON2ID:PASSWORD_BCRYPT;
+    $pdo->beginTransaction();
+    try{
+        $fields="display_name=:name,email=:email,phone_number=:phone,status=:status,failed_login_count=0,locked_until=NULL";
+        $params=['name'=>requiredString($payload,'display_name','el nombre',160),'email'=>$email,'phone'=>optionalString($payload,'phone_number',40),'status'=>$status,'id'=>$targetId];
+        if(!$isProtected){$fields.=',primary_area_id=:area';$params['area']=$access['area']['id'];}
+        if($password!==''){$fields.=',password_hash=:hash,must_change_password=0';$params['hash']=password_hash($password,$algorithm);}
+        $pdo->prepare("UPDATE app_users SET {$fields} WHERE id=:id")->execute($params);
+        if(!$isProtected){
+            replaceUserAccess($pdo,$targetId,(int)$user['id'],$access);
+            syncMaintenanceTechnician($pdo,$targetId,(int)$user['id'],$access,$payload);
+        }
+        writeAudit($pdo,(int)$user['id'],'UPDATE','app_user',$targetId,['email'=>$email,'phone'=>optionalString($payload,'phone_number',40),'status'=>$status,'role'=>$isProtected?'SUPER_ADMIN':$access['roleCode'],'modules'=>$isProtected?['*']:$access['moduleCodes']]);
+        $pdo->commit();
+        return ['id'=>$targetId,'email'=>$email,'status'=>$status];
+    }catch(Throwable $error){
+        if($pdo->inTransaction())$pdo->rollBack();
+        throw $error;
+    }
+}
+
+function userAccessSelection(PDO $pdo,array $payload): array
+{
     $area=findOne($pdo,"SELECT id,code,name FROM areas WHERE id=:id AND is_active=1",['id'=>(int)($payload['area_id']??0)],'El área no existe o está inactiva.');
     $roleCode=strtoupper(requiredString($payload,'role_code','el rol',40));
-    $allowedRoles=['OPERATOR','APPROVER','VIEWER','TECHNICIAN'];
-    if (!$isAdmin && !in_array($roleCode,$allowedRoles,true)) failRequest('No puedes asignar ese rol.',422);
-    if ($isAdmin && $roleCode==='SUPER_ADMIN') failRequest('El sistema solo permite un administrador general.',422);
-    if ($roleCode==='TECHNICIAN' && $area['code']!=='MANTENIMIENTO') failRequest('El rol Técnico de mantenimiento solo puede pertenecer al área de Mantenimiento.',422);
+    if($roleCode==='SUPER_ADMIN')failRequest('El sistema solo permite un administrador general.',422);
+    if($roleCode==='TECHNICIAN'&&$area['code']!=='MANTENIMIENTO')failRequest('El rol Técnico de mantenimiento solo puede pertenecer al área de Mantenimiento.',422);
     $role=findOne($pdo,"SELECT id FROM roles WHERE code=:code AND is_active=1",['code'=>$roleCode],'El rol no existe o está inactivo.');
     $rawModules=$payload['module_codes']??[];
-    if (!is_array($rawModules)) $rawModules=explode(',',(string)$rawModules);
+    if(!is_array($rawModules))$rawModules=explode(',',(string)$rawModules);
     $moduleCodes=array_values(array_unique(array_filter(array_map(fn($value)=>strtoupper(trim((string)$value)),$rawModules))));
-    if (!$moduleCodes) failRequest('Indique al menos un módulo.',422);
-    if (in_array('ADMIN',$moduleCodes,true) || in_array('AUDIT_LOG',$moduleCodes,true)) failRequest('La administración global y su bitácora están reservadas al administrador del sistema.',422);
+    if(!$moduleCodes)failRequest('Indique al menos un módulo.',422);
+    if(in_array('ADMIN',$moduleCodes,true)||in_array('AUDIT_LOG',$moduleCodes,true))failRequest('La administración global y su bitácora están reservadas al administrador del sistema.',422);
+    return ['area'=>$area,'role'=>$role,'roleCode'=>$roleCode,'moduleCodes'=>$moduleCodes];
+}
+
+function replaceUserAccess(PDO $pdo,int $targetId,int $adminId,array $access): void
+{
     $actionsByRole=[
         'VIEWER'=>['VIEW','EXPORT'],
         'OPERATOR'=>['VIEW','CREATE','UPDATE','POST','EXPORT'],
@@ -526,33 +600,34 @@ function createUser(PDO $pdo, array $user, array $payload): array
         'AREA_ADMIN'=>['VIEW','CREATE','UPDATE','APPROVE','REJECT','POST','EXPORT','ADMIN'],
         'TECHNICIAN'=>['VIEW','CREATE','UPDATE'],
     ];
-    $algorithm=defined('PASSWORD_ARGON2ID')?PASSWORD_ARGON2ID:PASSWORD_BCRYPT;
-    $pdo->beginTransaction();
-    $insert=$pdo->prepare("INSERT INTO app_users (primary_area_id,email,display_name,password_hash,status,must_change_password) VALUES (:area,:email,:name,:hash,'ACTIVE',0)");
-    $insert->execute(['area'=>$area['id'],'email'=>$email,'name'=>requiredString($payload,'display_name','el nombre',160),'hash'=>password_hash($password,$algorithm)]);
-    $newUserId=(int)$pdo->lastInsertId();
-    $pdo->prepare("INSERT INTO user_roles (user_id,role_id,is_active,assigned_by) VALUES (:user,:role,1,:admin)")->execute(['user'=>$newUserId,'role'=>$role['id'],'admin'=>$user['id']]);
-    $grant=$pdo->prepare("INSERT INTO user_permission_overrides (user_id,permission_id,decision,changed_by) SELECT :user,p.id,'ALLOW',:admin FROM permissions p INNER JOIN app_modules m ON m.id=p.module_id WHERE m.code=:module AND m.is_active=1 AND p.action_code=:action");
+    $roleId=(int)$access['role']['id'];$roleCode=(string)$access['roleCode'];$moduleCodes=$access['moduleCodes'];
+    $pdo->prepare("UPDATE user_roles SET is_active=0 WHERE user_id=:user AND is_active=1")->execute(['user'=>$targetId]);
+    $pdo->prepare("INSERT INTO user_roles (user_id,role_id,is_active,assigned_by) VALUES (:user,:role,1,:admin) ON DUPLICATE KEY UPDATE is_active=1,assigned_by=VALUES(assigned_by),assigned_at=UTC_TIMESTAMP(6)")->execute(['user'=>$targetId,'role'=>$roleId,'admin'=>$adminId]);
+    $pdo->prepare("DELETE FROM user_permission_overrides WHERE user_id=:user")->execute(['user'=>$targetId]);
+    $grant=$pdo->prepare("INSERT INTO user_permission_overrides (user_id,permission_id,decision,changed_by) SELECT :user,p.id,'ALLOW',:admin FROM permissions p INNER JOIN app_modules m ON m.id=p.module_id WHERE m.code=:module AND m.is_active=1 AND p.action_code=:action ON DUPLICATE KEY UPDATE decision='ALLOW',changed_by=VALUES(changed_by),changed_at=UTC_TIMESTAMP(6)");
     foreach($moduleCodes as $moduleCode){
-        $exists=findOne($pdo,"SELECT id FROM app_modules WHERE code=:code AND is_active=1",['code'=>$moduleCode],"El módulo {$moduleCode} no existe.");
-        if(isset($actionsByRole[$roleCode])){foreach($actionsByRole[$roleCode] as $action)$grant->execute(['user'=>$newUserId,'admin'=>$user['id'],'module'=>$moduleCode,'action'=>$action]);}
+        findOne($pdo,"SELECT id FROM app_modules WHERE code=:code AND is_active=1",['code'=>$moduleCode],"El módulo {$moduleCode} no existe.");
+        if(isset($actionsByRole[$roleCode]))foreach($actionsByRole[$roleCode] as $action)$grant->execute(['user'=>$targetId,'admin'=>$adminId,'module'=>$moduleCode,'action'=>$action]);
         else{
-            $roleModule=safeScalar($pdo,"SELECT COUNT(*) FROM role_permissions rp INNER JOIN permissions p ON p.id=rp.permission_id INNER JOIN app_modules m ON m.id=p.module_id WHERE rp.role_id=:role AND m.code=:module",['role'=>$role['id'],'module'=>$moduleCode]);
+            $roleModule=safeScalar($pdo,"SELECT COUNT(*) FROM role_permissions rp INNER JOIN permissions p ON p.id=rp.permission_id INNER JOIN app_modules m ON m.id=p.module_id WHERE rp.role_id=:role AND m.code=:module",['role'=>$roleId,'module'=>$moduleCode]);
             if($roleModule<1)failRequest('El rol personalizado no incluye uno de los módulos seleccionados.',422);
         }
     }
     if(!isset($actionsByRole[$roleCode])){
-        $allRolePermissions=safeRows($pdo,"SELECT rp.permission_id,m.code FROM role_permissions rp INNER JOIN permissions p ON p.id=rp.permission_id INNER JOIN app_modules m ON m.id=p.module_id WHERE rp.role_id=:role",['role'=>$role['id']]);
+        $allRolePermissions=safeRows($pdo,"SELECT rp.permission_id,m.code FROM role_permissions rp INNER JOIN permissions p ON p.id=rp.permission_id INNER JOIN app_modules m ON m.id=p.module_id WHERE rp.role_id=:role",['role'=>$roleId]);
         $deny=$pdo->prepare("INSERT INTO user_permission_overrides (user_id,permission_id,decision,changed_by) VALUES (:user,:permission,'DENY',:admin)");
-        foreach($allRolePermissions as $permission)if(!in_array($permission['code'],$moduleCodes,true))$deny->execute(['user'=>$newUserId,'permission'=>$permission['permission_id'],'admin'=>$user['id']]);
+        foreach($allRolePermissions as $permission)if(!in_array($permission['code'],$moduleCodes,true))$deny->execute(['user'=>$targetId,'permission'=>$permission['permission_id'],'admin'=>$adminId]);
     }
-    if($roleCode==='TECHNICIAN'){
-        $pdo->prepare("INSERT INTO maintenance_technicians (user_id,specialties,phone,created_by) VALUES (:user,:specialties,:phone,:creator)")
-            ->execute(['user'=>$newUserId,'specialties'=>optionalString($payload,'specialties',500),'phone'=>optionalString($payload,'phone',40),'creator'=>$user['id']]);
+}
+
+function syncMaintenanceTechnician(PDO $pdo,int $targetId,int $adminId,array $access,array $payload): void
+{
+    if($access['roleCode']==='TECHNICIAN'){
+        $pdo->prepare("INSERT INTO maintenance_technicians (user_id,specialties,phone,is_active,created_by) VALUES (:user,:specialties,:phone,1,:creator) ON DUPLICATE KEY UPDATE specialties=COALESCE(VALUES(specialties),specialties),phone=VALUES(phone),is_active=1")
+            ->execute(['user'=>$targetId,'specialties'=>optionalString($payload,'specialties',500),'phone'=>optionalString($payload,'phone_number',40),'creator'=>$adminId]);
+    }else{
+        $pdo->prepare("UPDATE maintenance_technicians SET is_active=0 WHERE user_id=:user")->execute(['user'=>$targetId]);
     }
-    writeAudit($pdo,(int)$user['id'],'CREATE','app_user',$newUserId,['email'=>$email,'role'=>$roleCode,'modules'=>$moduleCodes]);
-    $pdo->commit();
-    return ['id'=>$newUserId,'email'=>$email];
 }
 
 function createSupplier(PDO $pdo, array $user, array $payload): array
