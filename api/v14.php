@@ -35,7 +35,7 @@ function itemTypesForUserV14(PDO $pdo, int $userId, bool $isAdmin): array
     }
     $types=[];
     if (userHasPermission($pdo,$userId,'WAREHOUSE_RAW','VIEW')) $types=array_merge($types,['RAW_FRUIT','RAW_OTHER','BULK_OIL']);
-    if (userHasPermission($pdo,$userId,'WAREHOUSE_PACKAGING','VIEW')) $types=array_merge($types,['PACKAGING','CONSUMABLE']);
+    if (userHasPermission($pdo,$userId,'WAREHOUSE_PACKAGING','VIEW')) $types[]='PACKAGING';
     if (userHasPermission($pdo,$userId,'WAREHOUSE_SPARES','VIEW')) $types[]='SPARE_PART';
     if (userHasPermission($pdo,$userId,'WAREHOUSE_FINISHED','VIEW')) $types[]='FINISHED_GOOD';
     if (hasAnyPermissionV14($pdo,$userId,['PURCHASING','APPOINTMENTS','RECEIVING'],'VIEW')) $types=array_merge($types,['RAW_FRUIT','RAW_OTHER','BULK_OIL','PACKAGING','CONSUMABLE','SPARE_PART']);
@@ -77,7 +77,7 @@ function applyV14DataScope(PDO $pdo, array $user, bool $isAdmin, array &$result)
     $warehouseItemTypes=[];
     if (userHasPermission($pdo,$userId,'INVENTORY','VIEW')) $warehouseItemTypes=['RAW_FRUIT','RAW_OTHER','BULK_OIL','PACKAGING','CONSUMABLE','SPARE_PART','FINISHED_GOOD'];
     if (userHasPermission($pdo,$userId,'WAREHOUSE_RAW','VIEW')) $warehouseItemTypes=array_merge($warehouseItemTypes,['RAW_FRUIT','RAW_OTHER','BULK_OIL']);
-    if (userHasPermission($pdo,$userId,'WAREHOUSE_PACKAGING','VIEW')) $warehouseItemTypes=array_merge($warehouseItemTypes,['PACKAGING','CONSUMABLE']);
+    if (userHasPermission($pdo,$userId,'WAREHOUSE_PACKAGING','VIEW')) $warehouseItemTypes[]='PACKAGING';
     if (userHasPermission($pdo,$userId,'WAREHOUSE_SPARES','VIEW')) $warehouseItemTypes[]='SPARE_PART';
     if (userHasPermission($pdo,$userId,'WAREHOUSE_FINISHED','VIEW')) $warehouseItemTypes[]='FINISHED_GOOD';
     $warehouseItemTypes=array_values(array_unique($warehouseItemTypes));
@@ -161,20 +161,25 @@ function createAreaItemV14(PDO $pdo, array $user, array $payload): array
 {
     requireArea($pdo,$user,['ALMACEN']);
     $type=strtoupper(requiredString($payload,'item_type','el tipo de producto o material',30));
-    $allowed=['RAW_FRUIT','RAW_OTHER','BULK_OIL','PACKAGING','CONSUMABLE','SPARE_PART','FINISHED_GOOD'];
+    $allowed=['RAW_FRUIT','RAW_OTHER','BULK_OIL','PACKAGING','SPARE_PART','FINISHED_GOOD'];
     if(!in_array($type,$allowed,true))failRequest('El tipo de producto o material no es válido.',422);
     requireAnyPermissionV14($pdo,(int)$user['id'],[itemModuleV14($type),'CATALOGS'],'CREATE');
     $uomCode=strtoupper(requiredString($payload,'uom_code','la unidad de medida',20));
-    if(in_array($type,['RAW_FRUIT','RAW_OTHER','BULK_OIL'],true)&&!in_array($uomCode,['KG','L'],true))failRequest('Materia prima únicamente se registra en kilogramos o litros.',422);
+    if($type==='RAW_FRUIT'&&$uomCode!=='KG')failRequest('El aguacate en fruta únicamente se registra en kilogramos.',422);
+    if(in_array($type,['RAW_OTHER','BULK_OIL'],true)&&!in_array($uomCode,['KG','L'],true))failRequest('El aceite y las demás materias primas únicamente se registran en kilogramos o litros.',422);
+    if($type==='PACKAGING'&&!in_array($uomCode,['EA','BOX','PALLET','KG','L','ROLL','BAG','DRUM'],true))failRequest('Selecciona una unidad válida para materiales de empaque.',422);
+    if($type==='SPARE_PART'&&!in_array($uomCode,['EA','BOX','PALLET','KG','L'],true))failRequest('Selecciona una unidad válida para refacciones.',422);
     $categoryCode=match($type){'RAW_FRUIT'=>'FRUIT','RAW_OTHER'=>'RAW','BULK_OIL'=>'BULK','PACKAGING'=>'PACK','CONSUMABLE'=>'CONSUM','SPARE_PART'=>'SPARE','FINISHED_GOOD'=>'FG'};
     $category=findOne($pdo,"SELECT id FROM item_categories WHERE code=:category AND is_active=1",['category'=>$categoryCode],'Falta la categoría base correspondiente.');
     $uom=findOne($pdo,"SELECT id FROM units_of_measure WHERE code=:uom",['uom'=>$uomCode],'La unidad de medida no existe.');
     $sku=masterCode($payload,'sku','el código',80);
     if(safeScalar($pdo,"SELECT COUNT(*) FROM items WHERE sku=:sku",['sku'=>$sku])>0)failRequest('Ese código ya existe.',409);
+    $itemName=requiredString($payload,'item_name','el nombre',190);$plainName=strtoupper(trim((string)preg_replace('/\s+/',' ',iconv('UTF-8','ASCII//TRANSLIT//IGNORE',$itemName)?:$itemName)));
+    if($type==='PACKAGING'&&preg_match('/^(AGUACATE|FRUTA|ACEITE(?: CRUDO| REFINADO)?|MATERIA PRIMA)$/',$plainName))failRequest('Ese nombre corresponde a materia prima. Regístralo únicamente desde Materia prima y aceites.',422);
     $reorder=filter_var($payload['reorder_point']??0,FILTER_VALIDATE_FLOAT);if($reorder===false||$reorder<0)failRequest('El punto de reorden no es válido.',422);
     $quality=in_array($type,['RAW_FRUIT','RAW_OTHER','BULK_OIL','PACKAGING','FINISHED_GOOD'],true)?1:0;
     $lot=in_array($type,['SPARE_PART','CONSUMABLE'],true)?0:1;
-    $pdo->prepare("INSERT INTO items (category_id,base_uom_id,sku,name,item_type,lot_controlled,quality_required,reorder_point,created_by) VALUES (:category,:uom,:sku,:name,:type,:lot,:quality,:reorder,:user)")->execute(['category'=>$category['id'],'uom'=>$uom['id'],'sku'=>$sku,'name'=>requiredString($payload,'item_name','el nombre',190),'type'=>$type,'lot'=>$lot,'quality'=>$quality,'reorder'=>$reorder,'user'=>$user['id']]);
+    $pdo->prepare("INSERT INTO items (category_id,base_uom_id,sku,name,item_type,lot_controlled,quality_required,reorder_point,created_by) VALUES (:category,:uom,:sku,:name,:type,:lot,:quality,:reorder,:user)")->execute(['category'=>$category['id'],'uom'=>$uom['id'],'sku'=>$sku,'name'=>$itemName,'type'=>$type,'lot'=>$lot,'quality'=>$quality,'reorder'=>$reorder,'user'=>$user['id']]);
     $id=(int)$pdo->lastInsertId();writeAudit($pdo,(int)$user['id'],'CREATE','item',$id,['sku'=>$sku,'type'=>$type,'module'=>itemModuleV14($type)]);return ['id'=>$id,'code'=>$sku];
 }
 
@@ -205,7 +210,7 @@ function createAppointmentV14(PDO $pdo, array $user, array $payload): array
 function createReceiptV14(PDO $pdo, array $user, array $payload): array
 {
     requireArea($pdo,$user,['ALMACEN']);
-    $line=findOne($pdo,"SELECT al.id,al.appointment_id,al.item_id,al.destination_warehouse_id,al.uom_id,al.expected_qty,al.received_qty,a.appointment_number,a.supplier_id,a.origin_id,s.short_code,o.origin_code,i.sku,i.name,i.item_type FROM inbound_appointment_lines al INNER JOIN inbound_appointments a ON a.id=al.appointment_id INNER JOIN suppliers s ON s.id=a.supplier_id INNER JOIN supplier_origins o ON o.id=a.origin_id INNER JOIN items i ON i.id=al.item_id WHERE al.id=:line AND al.line_status IN ('EXPECTED','PARTIALLY_RECEIVED') AND a.status NOT IN ('COMPLETED','CANCELLED','NO_SHOW')",['line'=>(int)($payload['appointment_line_id']??0)],'Selecciona una partida WID pendiente.');
+    $line=findOne($pdo,"SELECT al.id,al.appointment_id,al.item_id,al.destination_warehouse_id,al.uom_id,al.expected_qty,al.received_qty,a.appointment_number,a.supplier_id,a.origin_id,s.short_code,o.origin_code,i.sku,i.name,i.item_type,u.code AS uom_code FROM inbound_appointment_lines al INNER JOIN inbound_appointments a ON a.id=al.appointment_id INNER JOIN suppliers s ON s.id=a.supplier_id INNER JOIN supplier_origins o ON o.id=a.origin_id INNER JOIN items i ON i.id=al.item_id INNER JOIN units_of_measure u ON u.id=al.uom_id WHERE al.id=:line AND al.line_status IN ('EXPECTED','PARTIALLY_RECEIVED') AND a.status NOT IN ('COMPLETED','CANCELLED','NO_SHOW')",['line'=>(int)($payload['appointment_line_id']??0)],'Selecciona una partida WID pendiente.');
     requireAnyPermissionV14($pdo,(int)$user['id'],[itemModuleV14($line['item_type']),'RECEIVING'],'CREATE');
     $location=findOne($pdo,"SELECT id,location_type FROM warehouse_locations WHERE id=:location AND warehouse_id=:warehouse AND is_active=1",['location'=>(int)($payload['location_id']??0),'warehouse'=>$line['destination_warehouse_id']],'Selecciona una ubicación de recibo o cuarentena del almacén destino.');
     if(!in_array($location['location_type'],['RECEIVING','QUALITY_HOLD'],true))failRequest('La recepción debe entrar a una ubicación de recibo o cuarentena.',422);
@@ -219,7 +224,7 @@ function createReceiptV14(PDO $pdo, array $user, array $payload): array
         $lotCode=$base;$suffix=1;while(safeScalar($pdo,"SELECT COUNT(*) FROM inventory_lots WHERE item_id=:item AND lot_code=:lot",['item'=>$line['item_id'],'lot'=>$lotCode])>0)$lotCode=$base.'-'.str_pad((string)++$suffix,2,'0',STR_PAD_LEFT);
         $pdo->prepare("UPDATE pre_lots SET status='RECEIVED',confirmed_at=COALESCE(confirmed_at,UTC_TIMESTAMP(6)) WHERE id=:id")->execute(['id'=>$prelotId]);
         $pdo->prepare("INSERT INTO inventory_lots (item_id,lot_code,prelot_id,supplier_id,origin_id,received_date,quality_status,lot_status,created_by) VALUES (:item,:lot,:prelot,:supplier,:origin,:received,'PENDING','BLOCKED',:user)")->execute(['item'=>$line['item_id'],'lot'=>$lotCode,'prelot'=>$prelotId,'supplier'=>$line['supplier_id'],'origin'=>$line['origin_id'],'received'=>$date,'user'=>$user['id']]);$lotId=(int)$pdo->lastInsertId();
-        $grossWeight=$line['item_type']==='RAW_FRUIT'?$received:null;
+        $grossWeight=$line['uom_code']==='KG'?$received:null;
         $pdo->prepare("INSERT INTO goods_receipts (receipt_number,appointment_id,prelot_id,supplier_id,warehouse_id,arrived_at,gross_weight_kg,tare_weight_kg,status,received_by) VALUES (:number,:appointment,:prelot,:supplier,:warehouse,UTC_TIMESTAMP(6),:gross,0,'WAITING_QUALITY',:user)")->execute(['number'=>provisionalNumber('REC'),'appointment'=>$line['appointment_id'],'prelot'=>$prelotId,'supplier'=>$line['supplier_id'],'warehouse'=>$line['destination_warehouse_id'],'gross'=>$grossWeight,'user'=>$user['id']]);$receiptId=(int)$pdo->lastInsertId();$receiptNumber=finalNumber('REC',$receiptId);$pdo->prepare("UPDATE goods_receipts SET receipt_number=:number WHERE id=:id")->execute(['number'=>$receiptNumber,'id'=>$receiptId]);
         $pdo->prepare("INSERT INTO goods_receipt_lines (receipt_id,line_no,item_id,inventory_lot_id,uom_id,ordered_qty,received_qty,notes) VALUES (:receipt,1,:item,:lot,:uom,:ordered,:received,:notes)")->execute(['receipt'=>$receiptId,'item'=>$line['item_id'],'lot'=>$lotId,'uom'=>$line['uom_id'],'ordered'=>$remaining?:$line['expected_qty'],'received'=>$received,'notes'=>optionalString($payload,'notes',500)]);$receiptLineId=(int)$pdo->lastInsertId();
         $qualityType=$line['item_type']==='RAW_FRUIT'?'INBOUND_FRUIT':'INBOUND_MATERIAL';$pdo->prepare("INSERT INTO quality_requests (request_number,request_type,receipt_line_id,inventory_lot_id,target_type,target_id,requested_by,status) VALUES (:number,:type,:receipt_line,:lot,'GOODS_RECEIPT',:receipt,:user,'REQUESTED')")->execute(['number'=>provisionalNumber('CAL'),'type'=>$qualityType,'receipt_line'=>$receiptLineId,'lot'=>$lotId,'receipt'=>$receiptId,'user'=>$user['id']]);$qualityId=(int)$pdo->lastInsertId();$qualityNumber=finalNumber('CAL',$qualityId);$pdo->prepare("UPDATE quality_requests SET request_number=:number WHERE id=:id")->execute(['number'=>$qualityNumber,'id'=>$qualityId]);

@@ -15,13 +15,13 @@
     { group: 'Almacenes', items: [
       ['warehouseRaw','●','Materia prima y aceites'],['warehousePackaging','▦','Materiales de empaque'],['warehouseSpares','⚙','Refacciones'],['warehouseFinished','✓','Producto terminado'],['warehouseAudits','◎','Inventarios y auditorías'],['movements','↔','Movimientos']
     ]},
-    { group: 'Áreas', items: [['purchasing','◷','Compras y citas'],['quality','✓','Calidad'],['extraction','⌁','Extracción'],['filling','▤','Envasado'],['maintenance','⚙','Mantenimiento']] },
+    { group: 'Áreas', items: [['purchasing','◷','Compras y citas'],['logistics','⌖','Logística y Tráfico'],['driverCollections','⇢','Mis recolecciones'],['quality','✓','Calidad'],['extraction','⌁','Extracción'],['filling','▤','Envasado'],['maintenance','⚙','Mantenimiento']] },
     { group: 'Planeación', items: [['forecast','▥','Forecast'],['mrp','∑','Necesidades de materiales']] },
     { group: 'Salidas', items: [['shipping','⇧','Embarques'],['returns','↩','Rechazos y devoluciones']] }
   ];
 
   const PAGE_META = {
-    dashboard:['MI ÁREA','Panel principal'],admin:['ADMINISTRACIÓN','Usuarios, roles y áreas'],purchasing:['COMPRAS','Pedidos, citas y WID'],quality:['CALIDAD','Solicitudes y resultados'],
+    dashboard:['MI ÁREA','Panel principal'],admin:['ADMINISTRACIÓN','Usuarios, roles y áreas'],purchasing:['COMPRAS','Pedidos, citas y WID'],logistics:['LOGÍSTICA Y TRÁFICO','Recolecciones y unidades'],driverCollections:['LOGÍSTICA','Mis recolecciones asignadas'],quality:['CALIDAD','Solicitudes y resultados'],
     warehouseRaw:['ALMACENES','Materia prima y aceites'],warehousePackaging:['ALMACENES','Materiales de empaque'],warehouseSpares:['ALMACENES','Refacciones'],warehouseFinished:['ALMACENES','Producto terminado'],warehouseAudits:['ALMACENES','Inventarios y auditorías'],movements:['KARDEX','Movimientos'],
     forecast:['PLANEACIÓN','Forecast'],mrp:['NECESIDADES','Necesidades de materiales'],filling:['ENVASADO','Órdenes y listas de materiales'],extraction:['EXTRACCIÓN','Proceso y trazabilidad'],shipping:['SALIDAS','Embarques'],returns:['NO CONFORMIDAD','Rechazos y devoluciones'],maintenance:['INTEGRACIÓN','Mantenimiento'],audit:['SEGURIDAD','Bitácora del sistema']
   };
@@ -31,7 +31,7 @@
     quality:['CALIDAD','Solicitar inspección'],qualityDecision:['CALIDAD','Registrar dictamen'],count:['ALMACÉN','Programar conteo'],return:['DEVOLUCIONES','Registrar devolución'],
     user:['USUARIOS','Registrar usuario'],userEdit:['USUARIOS','Configurar usuario y accesos'],supplier:['COMPRAS','Registrar proveedor'],origin:['COMPRAS','Registrar origen'],warehouse:['ALMACENES','Registrar almacén'],location:['ALMACENES','Registrar ubicación'],warehouseModule:['ALMACENES','Registrar almacén operativo'],locationModule:['ALMACENES','Registrar zona física'],item:['CATÁLOGOS','Registrar producto o material'],itemRaw:['ALMACÉN DE MATERIA PRIMA','Registrar materia prima o aceite'],itemPackaging:['ALMACÉN DE MATERIALES DE EMPAQUE','Registrar material de empaque'],itemSpare:['ALMACÉN DE REFACCIONES','Registrar refacción'],itemFinished:['ALMACÉN DE PRODUCTO TERMINADO','Registrar producto terminado'],customer:['VENTAS','Registrar cliente'],bom:['PLANEACIÓN DE MATERIALES','Agregar componente a una lista de materiales'],
     area:['ADMINISTRACIÓN','Registrar área'],role:['ADMINISTRACIÓN','Registrar rol'],technicianV14:['MANTENIMIENTO','Registrar técnico'],forecastImport:['PLANEACIÓN','Importar Forecast desde Excel'],maintenanceRequest:['MANTENIMIENTO','Registrar solicitud'],maintenanceAssignment:['MANTENIMIENTO','Asignar técnicos'],maintenanceUpdate:['MANTENIMIENTO','Responder tarea'],auditSchedule:['AUDITORÍA DE INVENTARIO','Programar días de auditoría'],
-    appointmentV14:['COMPRAS','Programar llegada y WID'],receiptV14:['ALMACÉN','Confirmar recepción'],productionOrder:['ENVASADO','Crear orden de producción'],productionCompletion:['PRODUCTO TERMINADO','Registrar producto terminado'],extractionBatch:['EXTRACCIÓN','Ingresar lote a extracción'],qualityDecisionV14:['CALIDAD','Capturar resultados y dictamen'],qualityCancel:['CALIDAD','Cancelar solicitud']
+    appointmentV14:['COMPRAS','Programar recolección de materia prima'],materialDeliveryV15:['COMPRAS','Programar entrega de empaque o refacción'],receiptV14:['ALMACÉN','Confirmar recepción'],vehicleV15:['LOGÍSTICA','Registrar unidad'],logisticsSiteV15:['LOGÍSTICA','Configurar destino en planta'],collectionAssignmentV15:['LOGÍSTICA','Asignar recolección'],productionOrder:['ENVASADO','Crear orden de producción'],productionCompletion:['PRODUCTO TERMINADO','Registrar producto terminado'],extractionBatch:['EXTRACCIÓN','Ingresar lote a extracción'],qualityDecisionV14:['CALIDAD','Capturar resultados y dictamen'],qualityCancel:['CALIDAD','Cancelar solicitud']
   };
 
   const operationFields = {
@@ -95,7 +95,9 @@
       <label>Razón social<input name="legal_name" required maxlength="190"></label>
       <label>Nombre comercial<input name="trade_name" maxlength="190"></label>
       <label>Contacto<input name="contact_name" maxlength="160"></label>
-      <label>Correo de contacto<input name="contact_email" type="email" maxlength="190"></label>`,
+      <label>Correo de contacto<input name="contact_email" type="email" maxlength="190"></label>
+      <label>Teléfono<input name="contact_phone" type="tel" maxlength="40"></label>
+      <label>Dirección principal<input name="address_text" maxlength="500"></label>`,
     origin: `
       <label>Código de proveedor<input name="supplier_code" required maxlength="40" placeholder="PROV-001"></label>
       <label>Código de origen<input name="origin_code" required maxlength="12" placeholder="URU"></label>
@@ -365,9 +367,9 @@
 
   function renderPage() {
     const renderer = {
-      dashboard:renderDashboard,admin:renderAdmin,purchasing:renderPurchasing,quality:renderQuality,
+      dashboard:renderDashboard,admin:renderAdmin,purchasing:renderPurchasing,logistics:renderLogistics,driverCollections:renderDriverCollections,quality:renderQuality,
       warehouseRaw:()=>renderWarehouseModule('RAW_MATERIAL',['RAW_FRUIT','RAW_OTHER','BULK_OIL'],'Materia prima y aceites','itemRaw'),
-      warehousePackaging:()=>renderWarehouseModule('PACKAGING',['PACKAGING','CONSUMABLE'],'Materiales de empaque','itemPackaging'),
+      warehousePackaging:()=>renderWarehouseModule('PACKAGING',['PACKAGING'],'Materiales de empaque','itemPackaging'),
       warehouseSpares:()=>renderWarehouseModule('SPARE_PARTS',['SPARE_PART'],'Refacciones','itemSpare'),
       warehouseFinished:()=>renderWarehouseModule('FINISHED_GOODS',['FINISHED_GOOD'],'Producto terminado','itemFinished'),
       warehouseAudits:renderWarehouseAudits,movements:renderMovements,forecast:renderForecast,mrp:renderMrp,filling:renderFilling,extraction:renderExtraction,
@@ -435,18 +437,17 @@
     const canAudit=can(moduleCode,'APPROVE')||can('COUNTS','APPROVE');
     const canComplete=finished&&(can(moduleCode,'POST')||can('FILLING','POST')||can('PRODUCTION','POST'));
     const actions=[
-      canInitial?`<button class="btn ghost" data-stocktake-type="${warehouseType}">Inventario físico</button>`:'',
+      canInitial?`<button class="btn primary" data-stocktake-type="${warehouseType}">Capturar existencias actuales</button>`:'',
       canAudit?`<button class="btn ghost" data-stocktake-type="${warehouseType}" data-audit-mode="audit">Auditar</button>`:'',
-      canCreate?`<button class="btn ghost" data-open-operation="warehouseModule" data-warehouse-type="${warehouseType}">Nuevo almacén</button>`:'',
-      canCreate?`<button class="btn ghost" data-open-operation="locationModule" data-warehouse-type="${warehouseType}">Nueva zona</button>`:'',
-      canCreate?`<button class="btn ghost" data-open-operation="${itemOperation}">${finished?'Nuevo producto':'Nuevo material'}</button>`:'',
+      canCreate?`<button class="btn ghost" data-open-operation="${itemOperation}">${finished?'Nuevo producto':warehouseType==='PACKAGING'?'Agregar material al catálogo':warehouseType==='SPARE_PARTS'?'Agregar refacción al catálogo':'Agregar materia prima al catálogo'}</button>`:'',
       canReceive?'<button class="btn primary" data-open-operation="receiptV14">Recibir cita WID</button>':'',
       canComplete?'<button class="btn primary" data-open-operation="productionCompletion">Registrar producto terminado</button>':''
     ].join('');
-    $('#view').innerHTML=`<div class="section-head"><div><h2>Almacén de ${h(title.toLowerCase())}</h2><p class="muted">Catálogo y existencias de este almacén, sin mezclar artículos de otras áreas. Las zonas indican dónde y en qué condición se encuentra físicamente cada material.</p></div>${actions?`<div class="actions">${actions}</div>`:''}</div>
+    const help=warehouseType==='PACKAGING'?'Selecciona botella, tapa, sello, etiqueta, caja u otro empaque del catálogo oficial y captura la cantidad física con su unidad.':warehouseType==='SPARE_PARTS'?'Selecciona únicamente refacciones del catálogo y captura su existencia física con la unidad correspondiente.':warehouseType==='RAW_MATERIAL'?'El aguacate se registra solamente en kilogramos; los aceites y demás materias primas usan su unidad configurada.':'Registra producto terminado contra su orden y lista de materiales.';
+    $('#view').innerHTML=`<div class="section-head"><div><h2>Almacén de ${h(title.toLowerCase())}</h2><p class="muted">${h(help)} Las ubicaciones técnicas se aplican automáticamente para conservar trazabilidad.</p></div>${actions?`<div class="actions">${actions}</div>`:''}</div>
       <div class="metric-grid">${metric('Productos o materiales',n(catalog.length),'◇','Catálogo activo')}${metric('Lotes o ubicaciones',n(inventory.length),'▦','Con existencia registrada')}${metric('Sin disponible',n(inventory.filter(x=>Number(x.available)<=0).length),'!','Bloqueado o agotado',inventory.some(x=>Number(x.available)<=0)?'danger':'')}${metric('Críticos',n(inventory.filter(x=>x.status==='Crítico').length),'◷','Según punto de reorden',inventory.some(x=>x.status==='Crítico')?'warning':'')}</div>
       <section class="card"><div class="card-head"><div><h3>Existencias</h3><p>Cantidad física y disponible por lote.</p></div><button class="btn ghost small" data-export>Descargar</button></div>${table(['Producto o material','Almacén','Lote','Existencia','Disponible','Unidad','Estado'],inventory.map(x=>[cell(x.item,x.sku),x.warehouse,folio(x.lot),n(x.onHand),n(x.available),unitLabel(x.uom),badge(x.status)]),'No hay existencias registradas en este almacén.')}</section>
-      <section class="card page-gap"><div class="card-head"><div><h3>Catálogo de ${h(title.toLowerCase())}</h3><p>Primero crea el artículo; después captura su inventario físico.</p></div></div>${table(['Código','Nombre','Unidad','Control por lote','Calidad'],catalog.map(x=>[folio(x.sku),x.name,unitLabel(x.uom_code),Number(x.lot_controlled)?'Sí':'No',Number(x.quality_required)?'Requerida':'No requerida']),'No hay artículos en este catálogo.')}</section>`;
+      <section class="card page-gap"><div class="card-head"><div><h3>Catálogo de ${h(title.toLowerCase())}</h3><p>Usa los registros existentes para capturar inventario. Agrega otro sólo si realmente no existe.</p></div></div>${table(['Código','Nombre','Unidad','Control por lote','Calidad'],catalog.map(x=>[folio(x.sku),x.name,unitLabel(x.uom_code),Number(x.lot_controlled)?'Sí':'No',Number(x.quality_required)?'Requerida':'No requerida']),'No hay artículos en este catálogo.')}</section>`;
   }
 
   function renderWarehouseAudits() {
@@ -467,15 +468,53 @@
     const upcoming = filterRows(data.upcoming || [], ['id', 'scheduled', 'supplier', 'material', 'status']);
     const needs = filterRows(data.needs || [], ['item', 'supplier', 'needDate']);
     const expected=filterRows(state.data.inboundExpected||[],['appointment','supplier','item','sku','warehouse','status']);
+    const collections=filterRows(state.data.collections||[],['planNumber','appointment','prelot','supplier','origin','item','purchaseOrder','status']);
     const canCreate=can('PURCHASING','CREATE')||can('APPOINTMENTS','CREATE');
     $('#view').innerHTML = `
-      <div class="section-head"><div><h2>Compras, citas y recepción esperada</h2><p class="muted">Cada cita usa proveedor, origen, material y almacén de catálogos. WID significa mercancía esperada: todavía no es inventario físico.</p></div>${canCreate?'<div class="actions"><button class="btn ghost" data-open-operation="supplier">Nuevo proveedor</button><button class="btn ghost" data-open-operation="origin">Nuevo origen</button><button class="btn primary" data-open-operation="appointmentV14">Programar llegada</button></div>':''}</div>
+      <div class="section-head"><div><h2>Compras, citas y recepción esperada</h2><p class="muted">Compras captura sólo los datos comerciales. La aplicación genera semana, fecha de solicitud, prefolio, estado y días de espera.</p></div>${canCreate?'<div class="actions"><button class="btn ghost" data-open-operation="supplier">Nuevo proveedor</button><button class="btn ghost" data-open-operation="origin">Nuevo origen</button><button class="btn ghost" data-open-operation="materialDeliveryV15">Entrega de empaque o refacción</button><button class="btn primary" data-open-operation="appointmentV14">Recolección de materia prima</button></div>':''}</div>
       <div class="metric-grid">${metric('Pedidos o entregas por llegar',n(upcoming.length),'▤','Agenda próxima')}${metric('Citas por confirmar',n(upcoming.filter(x=>/PLANNED|SENT|POR CONFIRMAR/i.test(x.status)).length),'◷','Dar seguimiento','warning')}${metric('Materiales necesarios',n(needs.length),'!','Faltantes del plan',needs.length?'danger':'')}${metric('Llegadas retrasadas',n(upcoming.filter(x=>Number(x.delayMinutes)>0).length),'⌛','Fuera de horario',upcoming.some(x=>Number(x.delayMinutes)>0)?'danger':'')}</div>
+      <section class="card"><div class="card-head"><div><h3>Recolecciones de materia prima</h3><p>Logística asigna unidad, conductor, contenedores y horario después de que Compras guarda la cita.</p></div></div>${table(['Semana','Solicitud','Recolección / prefolio','Proveedor y origen','Materia prima','Cantidad','Cita','Orden de compra','Estado'],collections.map(x=>[x.weekNumber,x.requestDate,cell(x.planNumber,x.prelot),cell(x.supplier,x.origin),x.item,`${n(x.expectedQty)} ${unitLabel(x.uom)}`,x.appointmentAt,x.purchaseOrder||'Sin referencia',badge(x.status)]),'No hay recolecciones programadas.')}</section>
       <section class="card"><div class="card-head"><div><h3>WID · mercancía esperada</h3><p>No afecta existencias hasta que Almacén confirme la recepción.</p></div></div>${table(['Cita','Pre-lote','Fecha','Proveedor','Material','Almacén destino','Esperado','Recibido','Pendiente','Estado'],expected.map(x=>[folio(x.appointment),folio(x.prelot),x.scheduled,x.supplier,cell(x.item,x.sku),x.warehouse,`${n(x.expected_qty)} ${x.uom}`,`${n(x.received_qty)} ${x.uom}`,`${n(x.pending_qty)} ${x.uom}`,badge(x.status)]),'No hay mercancía esperada en WID.')}</section>
       <div class="equal-grid">
         <section class="card"><div class="card-head"><div><h3>Próximas llegadas</h3><p>Proveedor, material, fecha y situación de la cita.</p></div></div>${table(['Cita','Fecha y hora','Proveedor','Material','Estado'],upcoming.map(x=>[folio(x.id),x.scheduled,x.supplier,x.material,badge(x.status)]),'No hay entregas programadas.')}</section>
         <section class="card"><div class="card-head"><div><h3>Necesidades de compra</h3><p>Faltantes calculados a partir del Forecast y las listas de materiales.</p></div></div>${table(['Material','Cantidad faltante','Fecha requerida','Proveedor sugerido'],needs.map(x=>[cell(x.item,x.sku),`${n(x.shortage)} ${x.uom}`,dateFmt(x.needDate),x.supplier]),'Ejecuta el cálculo de necesidades para obtener sugerencias.')}</section>
       </div>`;
+  }
+
+  function renderLogistics() {
+    const rows=filterRows(state.data.collections||[],['planNumber','appointment','supplier','origin','item','vehicle','driver','status']);
+    const vehicles=state.data.lookups?.vehicles||[];
+    const site=state.data.logisticsSite;
+    const canManage=can('LOGISTICS','CREATE')||can('LOGISTICS','UPDATE');
+    $('#view').innerHTML=`<div class="section-head"><div><h2>Coordinación de recolecciones</h2><p class="muted">Compras genera la solicitud. Aquí asignas unidad, conductor, contenedores y horario sin volver a capturar los datos comerciales.</p></div>${canManage?`<div class="actions"><button class="btn ghost" data-open-operation="logisticsSiteV15">${site?'Actualizar destino en planta':'Configurar destino en planta'}</button><button class="btn primary" data-open-operation="vehicleV15">Registrar unidad</button></div>`:''}</div>
+      <div class="metric-grid">${metric('Por asignar',n(rows.filter(x=>!x.driverUserId).length),'!','Sin unidad o conductor',rows.some(x=>!x.driverUserId)?'warning':'')}${metric('Programadas',n(rows.filter(x=>['CONFIRMED','PLANNED'].includes(x.status)).length),'◷','Pendientes de recorrido')}${metric('En ruta',n(rows.filter(x=>x.status==='IN_ROUTE').length),'⇢','Ubicación más reciente')}${metric('Unidades activas',n(vehicles.length),'▤','Catálogo de Logística')}</div>
+      ${!site?'<div class="notice page-gap"><strong>Configura una sola vez el destino en planta</strong><p>La latitud y longitud permiten calcular la ruta y hora estimada de llegada. El conductor siempre deberá autorizar la ubicación en su dispositivo.</p></div>':''}
+      <section class="card page-gap"><div class="card-head"><div><h3>Recolecciones de materia prima</h3><p>El botón Asignar aparece sólo para coordinación.</p></div></div>${table(['Recolección','Proveedor y origen','Materia prima','Cita','Presentación','Unidad y conductor','Llegada estimada','Estado',''],rows.map(x=>[cell(x.planNumber,x.prelot),cell(x.supplier,x.origin),cell(x.item,`${n(x.expectedQty)} ${unitLabel(x.uom)}`),x.appointmentAt,presentationLabel(x.presentation,x.binCount),cell(x.vehicle,x.driver),x.plantEta||'Por calcular',badge(x.status),canManage&&!['COMPLETED','CANCELLED'].includes(x.status)?trusted(`<button class="btn primary small" data-assign-collection="${h(x.id)}">Asignar</button>`):'Sólo consulta']),'No hay recolecciones programadas.')}</section>
+      <section class="card page-gap"><div class="card-head"><div><h3>Unidades</h3><p>Vehículo, placas, capacidad y conductor habitual.</p></div></div>${table(['Unidad','Placas','Tipo','Transportista','Capacidad','Conductor habitual'],vehicles.map(x=>[folio(x.unit_code),x.plate_number||'—',x.vehicle_type,x.carrier_name||'Propia',x.capacity_kg?`${n(x.capacity_kg)} kg`:'—',(state.data.lookups?.drivers||[]).find(d=>Number(d.id)===Number(x.default_driver_user_id))?.name||'Sin asignar']),'No hay unidades registradas.')}</section>`;
+  }
+
+  function renderDriverCollections() {
+    const rows=filterRows(state.data.driverCollections||[],['planNumber','appointment','supplier','origin','item','vehicle','status']);
+    const site=state.data.logisticsSite;
+    $('#view').innerHTML=`<div class="section-head"><div><h2>Mis recolecciones asignadas</h2><p class="muted">Actualiza el recorrido con botones simples. Tu ubicación sólo se solicita al iniciar, actualizar o confirmar llegada.</p></div></div>
+      ${rows.map(row=>driverCollectionCard(row,site)).join('')||'<section class="card card-pad"><h3>Sin recolecciones asignadas</h3><p class="muted">Cuando el coordinador te asigne una, aparecerá aquí y recibirás una notificación.</p></section>'}`;
+  }
+
+  function driverCollectionCard(row,site) {
+    const loaded=Boolean(row.loadedAt),started=Boolean(row.routeStartedAt),arrived=row.status==='ARRIVED';
+    const originQuery=encodeURIComponent(row.originAddress||row.origin||'');
+    const routeLink=row.lastLatitude&&row.lastLongitude&&site?.latitude&&site?.longitude?`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(`${row.lastLatitude},${row.lastLongitude}`)}&destination=${encodeURIComponent(`${site.latitude},${site.longitude}`)}&travelmode=driving`:'';
+    return `<section class="card trip-card"><div class="card-head"><div><p class="eyebrow">${h(row.planNumber)} · ${h(row.prelot)}</p><h3>${h(row.supplier)} · ${h(row.origin)}</h3><p>${h(row.originAddress||'Dirección pendiente de registrar')}</p></div>${badge(row.status)}</div>
+      <div class="detail-grid card-pad"><div class="detail"><small>Materia prima</small><strong>${h(row.item)}</strong></div><div class="detail"><small>Cantidad</small><strong>${n(row.expectedQty)} ${h(unitLabel(row.uom))}</strong></div><div class="detail"><small>Cita</small><strong>${h(row.appointmentAt)}</strong></div><div class="detail"><small>Unidad</small><strong>${h(row.vehicle)} ${row.plate?`· ${h(row.plate)}`:''}</strong></div><div class="detail"><small>Presentación</small><strong>${h(presentationLabel(row.presentation,row.binCount))}</strong></div><div class="detail"><small>Llegada estimada</small><strong>${h(row.plantEta||'Se calculará al iniciar')}</strong></div></div>
+      <div class="trip-actions card-pad"><a class="btn ghost" href="https://www.google.com/maps/search/?api=1&query=${originQuery}" target="_blank" rel="noopener">Ver origen</a>${!loaded?`<button class="btn primary" data-driver-action="LOADED" data-collection-id="${h(row.id)}">Unidad cargada</button>`:''}${loaded&&!started?`<button class="btn primary" data-driver-action="START_ROUTE" data-collection-id="${h(row.id)}">Iniciar recorrido a planta</button>`:''}${started&&!arrived?`<button class="btn ghost" data-driver-action="LOCATION_UPDATE" data-collection-id="${h(row.id)}">Actualizar ubicación</button><button class="btn primary" data-driver-action="ARRIVED" data-collection-id="${h(row.id)}">Llegué a planta</button>`:''}${routeLink?`<a class="btn ghost" href="${h(routeLink)}" target="_blank" rel="noopener">Abrir ruta óptima</a>`:''}</div>
+      ${routeMap(row,site)}</section>`;
+  }
+
+  function routeMap(row,site) {
+    if(!row.lastLatitude||!row.lastLongitude)return '<div class="route-placeholder"><strong>Mapa del recorrido</strong><span>Aparecerá después de iniciar el recorrido y permitir la ubicación.</span></div>';
+    const lat=Number(row.lastLatitude),lon=Number(row.lastLongitude),delta=.08;
+    const src=`https://www.openstreetmap.org/export/embed.html?bbox=${lon-delta}%2C${lat-delta}%2C${lon+delta}%2C${lat+delta}&layer=mapnik&marker=${lat}%2C${lon}`;
+    return `<div class="route-map"><iframe title="Ubicación más reciente de la unidad" loading="lazy" src="${h(src)}"></iframe><p>Última ubicación: ${h(row.lastLocationAt||'recién actualizada')}${row.routeDistanceKm?` · ${n(row.routeDistanceKm)} km restantes`:''}${row.routeDurationMinutes?` · aproximadamente ${n(row.routeDurationMinutes)} minutos`:''}${site?` · destino: ${h(site.siteName)}`:''}</p></div>`;
   }
 
   function renderReceiving() {
@@ -513,11 +552,13 @@
 
   function renderForecast() {
     const rows = filterRows(state.data.forecast, ['customer', 'sku', 'item', 'impact', 'status']);
+    const orders=filterRows(state.data.forecastVsProduction||[],['period','sku','item']);
     const changed = rows.filter(x => Number(x.delta) !== 0).length;
     const increased = rows.filter(x => Number(x.delta) > 0).length;
     $('#view').innerHTML = sectionHeader('Forecast original vs. vigente', 'Importa Excel; cada carga conserva la versión anterior y valida los códigos de producto terminado.', 'Importar archivo de Excel', 'forecastImport', true) + `
       <div class="equal-grid"><section class="card card-pad"><p class="eyebrow">COMPARACIÓN</p><h3>${n(rows.length)} líneas vigentes</h3><p>Plan original contra la versión marcada como actual.</p></section><section class="card card-pad"><p class="eyebrow">IMPACTO</p><h3>${n(changed)} cambios detectados</h3><p>${n(increased)} incrementos que deben volver a evaluarse en MRP.</p></section></div>
-      <section class="card page-gap">${table(['Cliente','Producto terminado','Original','Vigente','Cambio','Impacto','Cobertura'], rows.map(x => [x.customer, cell(x.item, `Código: ${x.sku}`), numCell(x.original), numCell(x.current), delta(x.delta), x.impact, badge(x.status)]), 'No hay cambios con ese criterio.')}</section>`;
+      <section class="card page-gap">${table(['Cliente','Producto terminado','Original','Vigente','Cambio','Impacto','Cobertura'], rows.map(x => [x.customer, cell(x.item, `Código: ${x.sku}`), numCell(x.original), numCell(x.current), delta(x.delta), x.impact, badge(x.status)]), 'No hay cambios con ese criterio.')}</section>
+      <section class="card page-gap"><div class="card-head"><div><h3>Forecast contra órdenes reales de producción</h3><p>Las órdenes de Envasado representan lo que realmente se programó fabricar; el terminado muestra lo ya producido.</p></div></div>${table(['Periodo','Producto terminado','Forecast','Ordenado','Terminado','Pendiente por ordenar','Cobertura de órdenes'],orders.map(x=>[x.period,cell(x.item,x.sku),n(x.forecastQty),n(x.orderedQty),n(x.completedQty),n(x.pendingToOrder),badge(`${n(x.orderCoverage||0)}%`)]),'Importa el Forecast y crea órdenes de producción para comparar.')}</section>`;
   }
 
   function renderMrp() {
@@ -584,7 +625,7 @@
   function renderStocktake() {
     const lookups = state.data.lookups || {};
     const selectedType=state.inventoryWarehouseType;
-    const itemTypesByWarehouse={RAW_MATERIAL:['RAW_FRUIT','RAW_OTHER','BULK_OIL'],PACKAGING:['PACKAGING','CONSUMABLE'],SPARE_PARTS:['SPARE_PART'],FINISHED_GOODS:['FINISHED_GOOD']};
+    const itemTypesByWarehouse={RAW_MATERIAL:['RAW_FRUIT','RAW_OTHER','BULK_OIL'],PACKAGING:['PACKAGING'],SPARE_PARTS:['SPARE_PART'],FINISHED_GOODS:['FINISHED_GOOD']};
     const allWarehouseModules=['WAREHOUSE_RAW','WAREHOUSE_PACKAGING','WAREHOUSE_SPARES','WAREHOUSE_FINISHED'];
     const scopeModules=selectedType?[warehouseModule(selectedType)]:allWarehouseModules;
     const mayInitial=can('INITIAL_INVENTORY','POST')||canAny(scopeModules,'POST');
@@ -607,7 +648,7 @@
           <label>Producto o material<select id="capture-item" required><option value="">Selecciona por nombre</option>${items.map(x=>`<option value="${h(x.id)}">${h(x.name)} · ${h(x.uom_name)}</option>`).join('')}</select></label>
           <label>Lote<input id="capture-lot" maxlength="100" placeholder="Solo cuando el material controla lote"></label>
           <label>Estado de Calidad<select id="capture-quality"><option value="APPROVED">Liberado</option><option value="CONDITIONAL">Liberado con condición</option><option value="PENDING">Pendiente de revisión</option><option value="REJECTED">Rechazado y bloqueado</option></select></label>
-          <label>Cantidad física<input id="capture-quantity" type="number" min="0" step="0.001" required></label>
+          <label>Cantidad física<input id="capture-quantity" type="number" min="0" step="any" required><small id="capture-quantity-help">Selecciona el material para ver la unidad.</small></label>
           <label>Observaciones<input id="capture-line-notes" maxlength="500"></label>
         </div>
         <div class="dialog-actions"><button class="btn ghost" id="capture-add-line">Agregar partida</button></div>
@@ -625,10 +666,13 @@
     if(mayCapture){
       $('#capture-warehouse').addEventListener('change', filterCaptureLocations);
       $('#capture-quality').addEventListener('change', filterCaptureLocations);
+      $('#capture-item').addEventListener('change', configureCaptureQuantity);
       $('#capture-add-line').addEventListener('click', addCaptureLine);
       $('#capture-save').addEventListener('click', saveCapture);
       bindCaptureLineActions();
+      if(warehouses.length===1)$('#capture-warehouse').value=warehouses[0].id;
       filterCaptureLocations();
+      configureCaptureQuantity();
     }
   }
 
@@ -653,12 +697,14 @@
   function addCaptureLine() {
     const warehouseId=$('#capture-warehouse').value,locationId=$('#capture-location').value,itemId=$('#capture-item').value;
     const quantity=Number($('#capture-quantity').value);if(!warehouseId||!locationId||!itemId||!Number.isFinite(quantity)||quantity<0||(state.inventoryCaptureMode==='initial'&&quantity===0))return toast(state.inventoryCaptureMode==='initial'?'La existencia inicial debe ser mayor que cero.':'Completa almacén, ubicación, material y cantidad.',true);
-    const lookups=state.data.lookups;const item=lookups.items.find(x=>String(x.id)===String(itemId));const location=(lookups.locationsV14||lookups.locations||[]).find(x=>String(x.id)===String(locationId));if(!item||!location)return toast('La selección no es válida.',true);
+    const lookups=state.data.lookups;const item=lookups.items.find(x=>String(x.id)===String(itemId));const location=(lookups.locationsV14||lookups.locations||[]).find(x=>String(x.id)===String(locationId));if(!item||!location)return toast('La selección no es válida.',true);if(Number(item.decimal_places)===0&&!Number.isInteger(quantity))return toast(`${item.name} se captura en ${unitLabel(item.uom_code)} enteros.`,true);
     const lot=$('#capture-lot').value.trim();if(Number(item.lot_controlled)===1&&!lot)return toast(`Indica el lote de ${item.name}.`,true);
     const duplicate=state.inventoryCaptureLines.some(line=>String(line.item_id)===String(itemId)&&String(line.location_id)===String(locationId)&&line.lot_code===lot);if(duplicate)return toast('Ese producto, ubicación y lote ya están en el levantamiento.',true);
     state.inventoryCaptureLines.push({item_id:Number(itemId),item_name:item.name,location_id:Number(locationId),location_name:location.name,lot_code:lot,quantity,quality_status:$('#capture-quality').value,notes:$('#capture-line-notes').value.trim(),uom:item.uom_name});
-    $('#capture-lines').innerHTML=captureLinesTable();$('#capture-save').disabled=false;bindCaptureLineActions();$('#capture-item').value='';$('#capture-lot').value='';$('#capture-quantity').value='';$('#capture-line-notes').value='';
+    $('#capture-lines').innerHTML=captureLinesTable();$('#capture-save').disabled=false;bindCaptureLineActions();$('#capture-item').value='';$('#capture-lot').value='';$('#capture-quantity').value='';$('#capture-line-notes').value='';configureCaptureQuantity();
   }
+
+  function configureCaptureQuantity(){const itemId=$('#capture-item')?.value||'',item=(state.data.lookups?.items||[]).find(x=>String(x.id)===String(itemId)),input=$('#capture-quantity'),help=$('#capture-quantity-help');if(!input||!help)return;if(!item){input.step='any';help.textContent='Selecciona el material para ver la unidad.';return;}const integer=Number(item.decimal_places)===0;input.step=integer?'1':'0.001';help.textContent=`Captura en ${unitLabel(item.uom_code)}${integer?' enteros':''}.`;}
 
   function bindCaptureLineActions(){
     $$('[data-remove-capture]').forEach(button=>button.addEventListener('click',()=>{state.inventoryCaptureLines.splice(Number(button.dataset.removeCapture),1);$('#capture-lines').innerHTML=captureLinesTable();$('#capture-save').disabled=!state.inventoryCaptureLines.length;bindCaptureLineActions();}));
@@ -818,6 +864,8 @@
     $$('[data-quality-decision]').forEach(button=>button.addEventListener('click',()=>openOperation('qualityDecisionV14',{requestId:Number(button.dataset.qualityDecision)})));
     $$('[data-quality-cancel]').forEach(button=>button.addEventListener('click',()=>openOperation('qualityCancel',{requestId:Number(button.dataset.qualityCancel)})));
     $$('[data-production-complete]').forEach(button=>button.addEventListener('click',()=>openOperation('productionCompletion',{orderId:Number(button.dataset.productionComplete)})));
+    $$('[data-assign-collection]').forEach(button=>button.addEventListener('click',()=>openOperation('collectionAssignmentV15',{collectionId:Number(button.dataset.assignCollection)})));
+    $$('[data-driver-action]').forEach(button=>button.addEventListener('click',()=>runDriverCollectionAction(Number(button.dataset.collectionId),button.dataset.driverAction)));
   }
 
   function renderFilling() {
@@ -837,6 +885,31 @@
       <div class="metric-grid">${metric('Procesos registrados',n(rows.length),'⌁','Lotes de extracción')}${metric('Meta',13,'◷','Contenedores por hora')}${metric('Dentro de meta',n(rows.filter(x=>Number(x.actualBeansHour)>=13).length),'✓','Ritmo igual o superior')}${metric('Pendientes de Calidad',n(rows.filter(x=>!['COMPLETED','CANCELLED'].includes(x.qualityStatus)).length),'!','Muestras por dictaminar',rows.some(x=>!['COMPLETED','CANCELLED'].includes(x.qualityStatus))?'warning':'')}</div>
       <section class="card">${table(['Lote de proceso','Inicio','Turno','Lote de aguacate origen','Alimentación','Ritmo real','Lote de aceite','Solicitud de Calidad','Estado'],rows.map(x=>[folio(x.batchCode),x.startedAt,x.shift,cell(x.sourceLot,x.sourceItem),`${n(x.beans)} contenedores`,`${n(x.actualBeansHour)} por hora`,cell(x.outputLot,x.outputItem),badge(x.qualityStatus),badge(x.status)]),'No hay procesos de extracción.')}</section>
       <section class="card page-gap"><div class="card-head"><div><h3>Resultados analíticos vinculados</h3><p>El lote de muestra nunca sustituye al lote de origen.</p></div></div>${table(['Proceso','Muestra','Fecha','Turno','Tipo','Aceite base seca','Aceite retenido','Aceite obtenido','Materia seca','Humedad'],results.map(x=>[folio(x.processLot),folio(x.sampleLot),dateFmt(x.sampleDate),x.shift,sampleTypeLabel(x.sampleType),pct(x.oilDryBasisPct),pct(x.retainedOilPct),n(x.oilObtainedQty),pct(x.dryMatterPct),pct(x.humidityPct)]),'Todavía no hay resultados de laboratorio.')}</section>`;
+  }
+
+  async function runDriverCollectionAction(collectionId,tripAction) {
+    const labels={LOADED:'Confirmando carga…',START_ROUTE:'Obteniendo ubicación e iniciando recorrido…',LOCATION_UPDATE:'Actualizando ubicación…',ARRIVED:'Confirmando llegada…'};
+    setLoading(true,labels[tripAction]||'Actualizando recorrido…');
+    try{
+      const payload={operation_type:'driverCollectionActionV15',collection_plan_id:collectionId,trip_action:tripAction,idempotency_key:crypto.randomUUID()};
+      if(tripAction!=='LOADED'){
+        const location=await currentPosition();payload.latitude=location.coords.latitude;payload.longitude=location.coords.longitude;payload.accuracy_m=location.coords.accuracy;
+        const site=state.data.logisticsSite;const estimate=site?await estimateRoute(payload.latitude,payload.longitude,Number(site.latitude),Number(site.longitude)):null;
+        if(estimate){payload.route_distance_km=estimate.distanceKm;payload.route_duration_minutes=estimate.durationMinutes;}
+      }
+      await api('createOperation',payload);state.data=await api('bootstrap');toast(tripAction==='START_ROUTE'?'Recorrido iniciado. Almacén fue notificado.':tripAction==='ARRIVED'?'Llegada confirmada. Almacén fue notificado.':'Avance guardado.');renderPage();
+    }catch(error){toast(error.message,true);}finally{setLoading(false);}
+  }
+
+  function currentPosition() {
+    return new Promise((resolve,reject)=>{
+      if(!navigator.geolocation)return reject(new Error('Este dispositivo no permite compartir ubicación.'));
+      navigator.geolocation.getCurrentPosition(resolve,error=>reject(new Error(error.code===1?'Debes permitir la ubicación para iniciar o actualizar el recorrido.':'No se pudo obtener la ubicación. Revisa GPS y conexión.')),{enableHighAccuracy:true,timeout:15000,maximumAge:30000});
+    });
+  }
+
+  async function estimateRoute(latitude,longitude,destinationLatitude,destinationLongitude) {
+    try{const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),8000);const response=await fetch(`https://router.project-osrm.org/route/v1/driving/${longitude},${latitude};${destinationLongitude},${destinationLatitude}?overview=false&steps=false`,{signal:controller.signal});clearTimeout(timeout);if(!response.ok)return null;const result=await response.json();const route=result.routes?.[0];return route?{distanceKm:Math.round(route.distance/10)/100,durationMinutes:Math.max(1,Math.round(route.duration/60))}:null;}catch(_){return null;}
   }
 
   function openOperation(type, context = {}) {
@@ -862,7 +935,11 @@
     if(type==='forecastImport') markup=forecastImportFields();
     if(type==='auditSchedule') markup=auditScheduleFields(lookups);
     if(type==='appointmentV14') markup=appointmentV14Fields(lookups);
+    if(type==='materialDeliveryV15') markup=materialDeliveryV15Fields(lookups);
     if(type==='receiptV14') markup=receiptV14Fields(lookups);
+    if(type==='vehicleV15') markup=vehicleV15Fields(lookups);
+    if(type==='logisticsSiteV15') markup=logisticsSiteV15Fields();
+    if(type==='collectionAssignmentV15') markup=collectionAssignmentV15Fields(lookups,state.operationContext?.collectionId);
     if(type==='productionOrder') markup=productionOrderFields(lookups);
     if(type==='productionCompletion') markup=productionCompletionFields(lookups,state.operationContext?.orderId);
     if(type==='extractionBatch') markup=extractionBatchFields(lookups);
@@ -892,7 +969,9 @@
     const hint=variant==='itemPackaging'?'<p class="span-2 muted">Registra cada material por su nombre completo: botella, tapa, sello, etiqueta frontal, etiqueta trasera o caja.</p>':variant==='itemFinished'?'<p class="span-2 muted">El código debe coincidir exactamente con el usado en el Forecast.</p>':'';
     const suggestions={itemRaw:['Aguacate Hass en fruta','Aceite crudo de aguacate','Aceite refinado listo para envasar'],itemPackaging:['Botella de vidrio de 500 mililitros','Tapa para botella de 500 mililitros','Sello para botella de 500 mililitros','Etiqueta frontal de 500 mililitros','Etiqueta trasera de 500 mililitros','Caja para doce botellas de 500 mililitros'],itemSpare:['Rodamiento para equipo de extracción'],itemFinished:['Aceite de aguacate en botella de 500 mililitros']}[variant]||[];
     const suggestionList=suggestions.length?`<datalist id="item-name-suggestions">${suggestions.map(name=>`<option value="${h(name)}"></option>`).join('')}</datalist>`:'';
-    return `<label>Código del producto o material<input name="sku" required maxlength="80" placeholder="${example}"></label><label>Nombre completo<input name="item_name" required maxlength="190" ${suggestions.length?'list="item-name-suggestions"':''} placeholder="Escribe o elige una sugerencia">${suggestionList}</label>${typeField}${category}<label>Unidad base<select name="uom_code" required><option value="">Selecciona la unidad</option>${(lookups.units||[]).map(x=>`<option value="${h(x.code)}">${h(x.name)}</option>`).join('')}</select></label><label>Punto de reorden<input name="reorder_point" type="number" min="0" step="0.001" value="0"></label>${hint}`;
+    const allowedUnits={itemRaw:['KG','L'],itemPackaging:['EA','BOX','PALLET','KG','L','ROLL','BAG','DRUM'],itemSpare:['EA','BOX','PALLET','KG','L'],itemFinished:['EA','BOX','PALLET','KG','L']}[variant]||null;
+    const units=(lookups.units||[]).filter(x=>!allowedUnits||allowedUnits.includes(x.code));
+    return `<label>Código del producto o material<input name="sku" required maxlength="80" placeholder="${example}"></label><label>Nombre completo<input name="item_name" required maxlength="190" ${suggestions.length?'list="item-name-suggestions"':''} placeholder="Escribe o elige una sugerencia">${suggestionList}</label>${typeField}${category}<label>Unidad base<select id="item-uom" name="uom_code" required><option value="">Selecciona la unidad</option>${units.map(x=>`<option value="${h(x.code)}">${h(x.name)}</option>`).join('')}</select><small id="item-uom-help">La unidad quedará fija para todas sus existencias.</small></label><label>Punto de reorden<input name="reorder_point" type="number" min="0" step="0.001" value="0"></label>${hint}`;
   }
 
   function warehouseModuleFields(warehouseType) {
@@ -916,12 +995,33 @@
   }
 
   function originFields(lookups) {
-    return `<label>Proveedor<select name="supplier_code" required><option value="">Selecciona el proveedor</option>${(lookups.suppliers||[]).map(x=>`<option value="${h(x.supplier_code)}">${h(x.name)} · ${h(x.supplier_code)}</option>`).join('')}</select></label><label>Código corto del origen<input name="origin_code" required maxlength="12" placeholder="Ej. URU"></label><label class="span-2">Nombre del origen<input name="origin_name" required maxlength="160" placeholder="Ej. Huerta Uruapan"></label><label>Municipio<input name="municipality" maxlength="120"></label><label>Estado<input name="state_name" maxlength="120"></label>`;
+    return `<label>Proveedor<select name="supplier_code" required><option value="">Selecciona el proveedor</option>${(lookups.suppliers||[]).map(x=>`<option value="${h(x.supplier_code)}">${h(x.name)} · ${h(x.supplier_code)}</option>`).join('')}</select></label><label>Código corto del origen<input name="origin_code" required maxlength="12" placeholder="Ej. URU"></label><label class="span-2">Nombre del origen<input name="origin_name" required maxlength="160" placeholder="Ej. Huerta Uruapan"></label><label>Municipio<input name="municipality" maxlength="120"></label><label>Estado<input name="state_name" maxlength="120"></label><label class="span-2">Dirección para recolección<input name="address_text" maxlength="500" required placeholder="Calle, número, colonia, municipio y estado"></label><label>Latitud opcional<input name="latitude" type="number" min="-90" max="90" step="any" placeholder="19.4326"></label><label>Longitud opcional<input name="longitude" type="number" min="-180" max="180" step="any" placeholder="-99.1332"></label>`;
   }
 
   function appointmentV14Fields(lookups) {
-    const warehouses=lookups.warehouses||[];
-    return `<label>Proveedor<select id="appointment-supplier" name="supplier_id" required><option value="">Selecciona el proveedor</option>${(lookups.suppliers||[]).map(x=>`<option value="${h(x.id)}">${h(x.name)} · ${h(x.supplier_code)}</option>`).join('')}</select></label><label>Origen<select id="appointment-origin" name="origin_id" required><option value="">Selecciona primero el proveedor</option>${(lookups.origins||[]).map(x=>`<option value="${h(x.id)}" data-supplier="${h(x.supplier_id)}">${h(x.origin_name)} · ${h(x.origin_code)}</option>`).join('')}</select></label><label>Material esperado<select id="appointment-item" name="item_id" required><option value="">Selecciona por nombre</option>${(lookups.items||[]).filter(x=>!['FINISHED_GOOD','SERVICE'].includes(x.item_type)).map(x=>`<option value="${h(x.id)}" data-item-type="${h(x.item_type)}">${h(x.name)} · ${h(x.sku)}</option>`).join('')}</select></label><label>Almacén destino<select id="appointment-warehouse" name="warehouse_id" required><option value="">Selecciona el material</option>${warehouses.map(x=>`<option value="${h(x.id)}" data-warehouse-type="${h(x.warehouse_type)}">${h(x.name)}</option>`).join('')}</select></label><label>Cantidad esperada<input name="expected_qty" type="number" min="0.000001" step="0.001" required></label><label>Tipo de llegada<select name="delivery_type"><option value="SUPPLIER_DELIVERY">Entrega de proveedor</option><option value="COLLECTION">Recolección</option><option value="TRANSFER">Transferencia</option><option value="RETURN">Devolución</option><option value="OTHER">Otra</option></select></label><label>Fecha y hora<input name="scheduled_at" type="datetime-local" required></label><label>Duración<select name="duration"><option value="60">1 hora</option><option value="90">1 hora 30 minutos</option><option value="120">2 horas</option></select></label><label class="span-2">Observaciones<textarea name="notes" rows="3" maxlength="1000"></textarea></label>`;
+    const warehouses=lookups.rawWarehouses||[];
+    const items=lookups.rawItems||[];
+    return `<div class="span-2 notice"><strong>Recolección de materia prima</strong><p>Al guardar se generan automáticamente la cita, recolección, prefolio y WID. Logística recibirá la tarea para asignar unidad y conductor.</p></div><label>Proveedor<select id="appointment-supplier" name="supplier_id" required><option value="">Selecciona el proveedor</option>${(lookups.suppliers||[]).map(x=>`<option value="${h(x.id)}">${h(x.name)} · ${h(x.supplier_code)}</option>`).join('')}</select></label><label>Origen de recolección<select id="appointment-origin" name="origin_id" required><option value="">Selecciona primero el proveedor</option>${(lookups.origins||[]).map(x=>`<option value="${h(x.id)}" data-supplier="${h(x.supplier_id)}">${h(x.origin_name)} · ${h(x.origin_code)}</option>`).join('')}</select></label><label>Materia prima<select id="appointment-item" name="item_id" required><option value="">Selecciona aguacate o aceite</option>${items.map(x=>`<option value="${h(x.id)}" data-item-type="${h(x.item_type)}" data-uom="${h(x.uom_code)}">${h(x.name)} · ${h(x.sku)} · ${h(unitLabel(x.uom_code))}</option>`).join('')}</select></label><label>Almacén destino<select id="appointment-warehouse" name="warehouse_id" required><option value="">Selecciona el almacén</option>${warehouses.map(x=>`<option value="${h(x.id)}" data-warehouse-type="${h(x.warehouse_type)}">${h(x.name)}</option>`).join('')}</select></label><label>Cantidad total a recolectar<input name="expected_qty" type="number" min="0.000001" step="any" required><small id="appointment-uom-help">Selecciona el material para ver la unidad.</small></label><label>Presentación<select id="appointment-presentation" name="transport_presentation" required><option value="">Selecciona el material primero</option></select></label><label>Fecha y hora de la cita<input name="scheduled_at" type="datetime-local" required></label><label>Duración<select name="duration"><option value="60">1 hora</option><option value="90">1 hora 30 minutos</option><option value="120">2 horas</option></select></label><label>Folio de orden de compra<input name="purchase_order_reference" maxlength="80" placeholder="Opcional"></label><label class="span-2">Comentarios de Compras<textarea name="notes" rows="3" maxlength="1000"></textarea></label>`;
+  }
+
+  function materialDeliveryV15Fields(lookups) {
+    const items=lookups.deliveryItems||[];
+    const warehouses=lookups.deliveryWarehouses||[];
+    return `<div class="span-2 notice"><strong>Entrega directa de proveedor</strong><p>Para materiales de empaque o refacciones. Genera WID y avisa al almacén correspondiente; no crea una ruta para conductor.</p></div><label>Proveedor<select id="appointment-supplier" name="supplier_id" required><option value="">Selecciona el proveedor</option>${(lookups.suppliers||[]).map(x=>`<option value="${h(x.id)}">${h(x.name)} · ${h(x.supplier_code)}</option>`).join('')}</select></label><label>Origen<select id="appointment-origin" name="origin_id" required><option value="">Selecciona primero el proveedor</option>${(lookups.origins||[]).map(x=>`<option value="${h(x.id)}" data-supplier="${h(x.supplier_id)}">${h(x.origin_name)} · ${h(x.origin_code)}</option>`).join('')}</select></label><label>Material o refacción<select id="appointment-item" name="item_id" required><option value="">Selecciona del catálogo</option>${items.map(x=>`<option value="${h(x.id)}" data-item-type="${h(x.item_type)}" data-uom="${h(x.uom_code)}">${h(x.name)} · ${h(x.sku)} · ${h(unitLabel(x.uom_code))}</option>`).join('')}</select></label><label>Almacén destino<select id="appointment-warehouse" name="warehouse_id" required><option value="">Selecciona el material</option>${warehouses.map(x=>`<option value="${h(x.id)}" data-warehouse-type="${h(x.warehouse_type)}">${h(x.name)}</option>`).join('')}</select></label><label>Cantidad esperada<input name="expected_qty" type="number" min="0.000001" step="any" required><small id="appointment-uom-help">Selecciona el material para ver la unidad.</small></label><label>Fecha y hora de entrega<input name="scheduled_at" type="datetime-local" required></label><label>Duración<select name="duration"><option value="60">1 hora</option><option value="90">1 hora 30 minutos</option><option value="120">2 horas</option></select></label><label class="span-2">Observaciones<textarea name="notes" rows="3" maxlength="1000"></textarea></label>`;
+  }
+
+  function vehicleV15Fields(lookups) {
+    return `<label>Código de unidad<input name="unit_code" required maxlength="40" placeholder="Ej. PIPA-01"></label><label>Placas<input name="plate_number" maxlength="30"></label><label>Tipo de unidad<select name="vehicle_type" required><option value="PIPA">Pipa</option><option value="TRACTOCAMION">Tractocamión</option><option value="CAMION">Camión</option><option value="CAMIONETA">Camioneta</option><option value="OTRA">Otra</option></select></label><label>Transportista<input name="carrier_name" maxlength="160" placeholder="Propia u operador logístico"></label><label>Marca o modelo<input name="make_model" maxlength="160"></label><label>Capacidad en kilogramos<input name="capacity_kg" type="number" min="0.001" step="any"></label><label class="span-2">Conductor habitual<select name="default_driver_user_id"><option value="">Sin conductor fijo</option>${(lookups.drivers||[]).map(x=>`<option value="${h(x.id)}">${h(x.name)} · ${h(x.email)}</option>`).join('')}</select></label><label class="span-2">Observaciones<textarea name="notes" rows="3" maxlength="1000"></textarea></label>`;
+  }
+
+  function logisticsSiteV15Fields() {
+    const site=state.data.logisticsSite||{};
+    return `<label>Nombre visible<input name="site_name" required maxlength="160" value="${h(site.siteName||'Planta Oleolab')}"></label><label class="span-2">Dirección completa<input name="address_text" required maxlength="500" value="${h(site.address||'')}"></label><label>Latitud<input name="latitude" type="number" min="-90" max="90" step="any" required value="${h(site.latitude||'')}"></label><label>Longitud<input name="longitude" type="number" min="-180" max="180" step="any" required value="${h(site.longitude||'')}"></label><p class="span-2 muted">Se configura una sola vez y se usa para estimar la ruta de regreso de todas las recolecciones.</p>`;
+  }
+
+  function collectionAssignmentV15Fields(lookups,collectionId) {
+    const plans=lookups.logisticsPlans||[];
+    return `<label class="span-2">Recolección<select id="logistics-plan" name="collection_plan_id" required><option value="">Selecciona la recolección</option>${plans.map(x=>`<option value="${h(x.id)}" data-item="${h(x.item)}" data-item-type="${h(x.item_type)}" data-appointment="${h(x.appointment_at)}" data-presentation="${h(x.transport_presentation||'')}" ${String(x.id)===String(collectionId)?'selected':''}>${h(x.plan_number)} · ${h(x.supplier)} · ${h(x.item)} · ${n(x.expected_qty)} ${h(unitLabel(x.uom_code))}</option>`).join('')}</select></label><label>Unidad<select id="logistics-vehicle" name="vehicle_id" required><option value="">Selecciona la unidad</option>${(lookups.vehicles||[]).map(x=>`<option value="${h(x.id)}" data-driver="${h(x.default_driver_user_id||'')}">${h(x.unit_code)} · ${h(x.plate_number||'sin placas')}</option>`).join('')}</select></label><label>Conductor<select id="logistics-driver" name="driver_user_id" required><option value="">Selecciona el conductor</option>${(lookups.drivers||[]).map(x=>`<option value="${h(x.id)}">${h(x.name)} · ${h(x.email)}</option>`).join('')}</select></label><label>Presentación<select id="logistics-presentation" name="transport_presentation" required></select></label><label>Número de contenedores<input id="logistics-bins" name="bin_count" type="number" min="0" max="1000" step="1" value="0"><small id="logistics-bins-help">Para aceites deja cero.</small></label><label>Horario de recolección<select id="appointment-time-mode" name="appointment_time_mode"><option value="ON_APPOINTMENT">Llegará en la fecha y hora de la cita</option><option value="RESCHEDULED">Usará otra fecha u hora</option></select></label><label id="pickup-reschedule" class="hidden">Nueva fecha y hora<input name="pickup_scheduled_at" type="datetime-local"></label><label>Llegada estimada inicial a planta<input name="planned_arrival" type="datetime-local"><small>Se recalculará con ubicación real al iniciar el recorrido.</small></label><label class="span-2">Comentarios de Logística<textarea name="logistics_notes" rows="3" maxlength="1000"></textarea></label>`;
   }
 
   function receiptV14Fields(lookups) {
@@ -957,7 +1057,10 @@
   }
 
   function bindOperationDependencies(type) {
-    if(type==='appointmentV14'){$('#appointment-supplier')?.addEventListener('change',filterAppointmentOrigins);$('#appointment-item')?.addEventListener('change',filterAppointmentWarehouses);filterAppointmentOrigins();filterAppointmentWarehouses();}
+    if(['user','userEdit'].includes(type)){$('[name="role_code"]')?.addEventListener('change',configureRoleModules);configureRoleModules();}
+    if(['appointmentV14','materialDeliveryV15'].includes(type)){$('#appointment-supplier')?.addEventListener('change',filterAppointmentOrigins);$('#appointment-item')?.addEventListener('change',()=>{filterAppointmentWarehouses();configureAppointmentMaterial(type);});filterAppointmentOrigins();filterAppointmentWarehouses();configureAppointmentMaterial(type);}
+    if(type==='collectionAssignmentV15'){$('#logistics-vehicle')?.addEventListener('change',selectDefaultDriver);$('#logistics-plan')?.addEventListener('change',configureCollectionAssignment);$('#appointment-time-mode')?.addEventListener('change',configureCollectionAssignment);configureCollectionAssignment();}
+    if(type==='itemRaw'){$('[name="item_type"]')?.addEventListener('change',configureRawItemUnit);configureRawItemUnit();}
     if(type==='receiptV14'){$('#receipt-line')?.addEventListener('change',filterReceiptLocations);filterReceiptLocations();}
     if(type==='extractionBatch'){$('#extraction-source')?.addEventListener('change',()=>{$('#extraction-source-location').value=$('#extraction-source').selectedOptions[0]?.dataset.location||'';});$('#extraction-source')?.dispatchEvent(new Event('change'));}
     if(type==='qualityDecisionV14'){$('#quality-request')?.addEventListener('change',configureQualityForm);$('#quality-disposition')?.addEventListener('change',configureQualityQuantities);$('[name="oil_obtained_qty"]')?.addEventListener('input',configureQualityQuantities);configureQualityForm();}
@@ -969,7 +1072,12 @@
   function configureLocationType(){const type=$('#location-type')?.value||'STORAGE';const values={STORAGE:['ALMACENAMIENTO','Existencia disponible','0'],RECEIVING:['RECIBO','Recepción temporal · mercancía recién llegada','0'],QUALITY_HOLD:['CUARENTENA','Pendiente de liberación por Calidad','1'],PICKING:['SURTIDO','Preparación de surtido','0'],SHIPPING:['EMBARQUE','Preparación de embarque','0'],REJECTED:['RECHAZADO','Producto rechazado · no disponible','1']}[type];if(!values)return;$('#location-code').value=values[0];$('#location-name').value=values[1];$('#location-blocked').value=values[2];}
 
   function filterAppointmentOrigins(){const supplier=$('#appointment-supplier')?.value||'';$$('#appointment-origin option[data-supplier]').forEach(x=>x.hidden=x.dataset.supplier!==supplier);if($('#appointment-origin')?.selectedOptions[0]?.hidden)$('#appointment-origin').value='';}
-  function filterAppointmentWarehouses(){const type=$('#appointment-item')?.selectedOptions[0]?.dataset.itemType||'';const expected={RAW_FRUIT:'RAW_MATERIAL',RAW_OTHER:'RAW_MATERIAL',BULK_OIL:'RAW_MATERIAL',PACKAGING:'PACKAGING',CONSUMABLE:'PACKAGING',SPARE_PART:'SPARE_PARTS'}[type]||'';$$('#appointment-warehouse option[data-warehouse-type]').forEach(x=>x.hidden=x.dataset.warehouseType!==expected);if($('#appointment-warehouse')?.selectedOptions[0]?.hidden)$('#appointment-warehouse').value='';}
+  function configureRoleModules(){const role=$('[name="role_code"]')?.value||'',forced={DRIVER:'DRIVER_COLLECTIONS',LOGISTICS_COORDINATOR:'LOGISTICS'}[role]||'';$$('[name="module_codes"]').forEach(input=>{if(forced){input.checked=input.value===forced;input.disabled=input.value!==forced;}else input.disabled=false;});}
+  function filterAppointmentWarehouses(){const type=$('#appointment-item')?.selectedOptions[0]?.dataset.itemType||'';const expected={RAW_FRUIT:'RAW_MATERIAL',RAW_OTHER:'RAW_MATERIAL',BULK_OIL:'RAW_MATERIAL',PACKAGING:'PACKAGING',SPARE_PART:'SPARE_PARTS'}[type]||'',visible=[];$$('#appointment-warehouse option[data-warehouse-type]').forEach(x=>{x.hidden=x.dataset.warehouseType!==expected;if(!x.hidden)visible.push(x);});if($('#appointment-warehouse')?.selectedOptions[0]?.hidden)$('#appointment-warehouse').value='';if(visible.length===1)$('#appointment-warehouse').value=visible[0].value;}
+  function configureAppointmentMaterial(type){const option=$('#appointment-item')?.selectedOptions[0],itemType=option?.dataset.itemType||'',uom=option?.dataset.uom||'',integerUnits=['EA','BOX','BEAN','PALLET','ROLL','BAG','DRUM'];if($('#appointment-uom-help'))$('#appointment-uom-help').textContent=uom?`Captura la cantidad en ${unitLabel(uom)}${integerUnits.includes(uom)?' enteros':''}.`:'Selecciona el material para ver la unidad.';const quantity=$('[name="expected_qty"]');if(quantity)quantity.step=integerUnits.includes(uom)?'1':'any';const presentation=$('#appointment-presentation');if(!presentation||type!=='appointmentV14')return;const values=itemType==='RAW_FRUIT'?[['BINS','Contenedores de fruta'],['OTHER','Otra presentación']]:itemType?[['TANKER','Pipa'],['IBC','Contenedor intermedio'],['OTHER','Otra presentación']]:[];presentation.innerHTML=`<option value="">${values.length?'Selecciona la presentación':'Selecciona el material primero'}</option>${values.map(x=>`<option value="${x[0]}">${x[1]}</option>`).join('')}`;}
+  function selectDefaultDriver(){const driver=$('#logistics-vehicle')?.selectedOptions[0]?.dataset.driver;if(driver)$('#logistics-driver').value=driver;}
+  function configureCollectionAssignment(){const plan=$('#logistics-plan')?.selectedOptions[0],itemType=plan?.dataset.itemType||'',presentation=plan?.dataset.presentation||'',select=$('#logistics-presentation');const values=itemType==='RAW_FRUIT'?[['BINS','Contenedores de fruta'],['OTHER','Otra']]:[['TANKER','Pipa'],['IBC','Contenedor intermedio'],['OTHER','Otra']];if(select){select.innerHTML=values.map(x=>`<option value="${x[0]}">${x[1]}</option>`).join('');if(values.some(x=>x[0]===presentation))select.value=presentation;}const bins=$('#logistics-bins');if(bins){bins.required=itemType==='RAW_FRUIT';bins.min=itemType==='RAW_FRUIT'?'1':'0';if(itemType==='RAW_FRUIT'&&Number(bins.value)<1)bins.value='1';if(itemType!=='RAW_FRUIT')bins.value='0';}if($('#logistics-bins-help'))$('#logistics-bins-help').textContent=itemType==='RAW_FRUIT'?'Indica cuántos contenedores llevará la unidad.':'Para aceites deja cero.';const mode=$('#appointment-time-mode')?.value||'ON_APPOINTMENT';$('#pickup-reschedule')?.classList.toggle('hidden',mode!=='RESCHEDULED');const input=$('#pickup-reschedule input');if(input)input.required=mode==='RESCHEDULED';}
+  function configureRawItemUnit(){const type=$('[name="item_type"]')?.value||'',select=$('#item-uom');if(!select)return;if(type==='RAW_FRUIT'){select.value='KG';select.disabled=true;if(!$('#item-uom-hidden'))select.insertAdjacentHTML('afterend','<input id="item-uom-hidden" type="hidden" name="uom_code" value="KG">');$('#item-uom-help').textContent='El aguacate en fruta siempre se registra en kilogramos.';}else{select.disabled=false;$('#item-uom-hidden')?.remove();if(!['KG','L'].includes(select.value))select.value='';$('#item-uom-help').textContent='Para aceites y otras materias primas selecciona kilogramos o litros.';}}
   function filterReceiptLocations(){const option=$('#receipt-line')?.selectedOptions[0],warehouse=option?.dataset.warehouse||'';$$('#receipt-location option[data-warehouse]').forEach(x=>x.hidden=x.dataset.warehouse!==warehouse);if($('#receipt-location')?.selectedOptions[0]?.hidden)$('#receipt-location').value='';if(option?.dataset.pending)$('#receipt-quantity').value=option.dataset.pending;}
   function configureQualityForm(){const option=$('#quality-request')?.selectedOptions[0],type=option?.dataset.requestType||'',received=Number(option?.dataset.received||0),warehouse=option?.dataset.warehouse||'';$('#quality-raw-fields')?.classList.toggle('hidden',type!=='INBOUND_FRUIT');$('#quality-extraction-fields')?.classList.toggle('hidden',type!=='IN_PROCESS');$('#quality-quantity-help').textContent=type==='IN_PROCESS'?'Captura Aceite obtenido; liberada + rechazada deben coincidir con ese resultado.':`Cantidad recibida o producida: ${n(received)} ${option?.dataset.uom||''}`;$$('#quality-accepted-location option[data-warehouse]').forEach(x=>x.hidden=type==='IN_PROCESS'?!['RAW_MATERIAL','PROCESS'].includes(x.dataset.warehouseType):x.dataset.warehouse!==warehouse);$$('#quality-rejected-location option[data-warehouse]').forEach(x=>x.hidden=type==='IN_PROCESS'?!['RAW_MATERIAL','PROCESS'].includes(x.dataset.warehouseType):x.dataset.warehouse!==warehouse);if($('#quality-accepted-location')?.selectedOptions[0]?.hidden)$('#quality-accepted-location').value='';if($('#quality-rejected-location')?.selectedOptions[0]?.hidden)$('#quality-rejected-location').value='';configureQualityQuantities();}
   function configureQualityQuantities(){const option=$('#quality-request')?.selectedOptions[0],type=option?.dataset.requestType||'',received=type==='IN_PROCESS'?Number($('[name="oil_obtained_qty"]')?.value||0):Number(option?.dataset.received||0),disposition=$('#quality-disposition')?.value||'APPROVED';$('#quality-accepted').value=disposition==='REJECTED'?0:(received||'');$('#quality-rejected').value=disposition==='REJECTED'?(received||''):0;}
@@ -1037,7 +1145,7 @@
       $('#operation-dialog').close();
       const missingLists=operationResult?.mrp?.missingBillsOfMaterial||[];
       const productionShortages=operationResult?.shortages||[];
-      toast(state.demo?'Operación simulada; no se modificó la base de datos.':missingLists.length?`Forecast guardado. Faltan listas de materiales para ${missingLists.length} producto(s).`:type==='productionOrder'&&productionShortages.length?`Orden creada con ${productionShortages.length} material(es) faltante(s). Quedó en revisión de materiales.`:'Operación guardada correctamente.');
+      toast(state.demo?'Operación simulada; no se modificó la base de datos.':operationResult?.prelot?`Operación guardada. Prefolio generado: ${operationResult.prelot}.`:missingLists.length?`Forecast guardado. Faltan listas de materiales para ${missingLists.length} producto(s).`:type==='productionOrder'&&productionShortages.length?`Orden creada con ${productionShortages.length} material(es) faltante(s). Quedó en revisión de materiales.`:'Operación guardada correctamente.');
       renderPage();
     } catch (error) { toast(error.message, true); }
     finally { submit.disabled = false; submit.textContent = submit.dataset.idleLabel; }
@@ -1080,7 +1188,7 @@
   function exportCurrentPage() {
     if(state.page==='quality'&&window.XLSX){const workbook=XLSX.utils.book_new();XLSX.utils.book_append_sheet(workbook,XLSX.utils.json_to_sheet(state.data.lotMaster||[]),'Maestro de lotes');XLSX.utils.book_append_sheet(workbook,XLSX.utils.json_to_sheet(state.data.rawQualityMaster||[]),'Materia prima');XLSX.utils.book_append_sheet(workbook,XLSX.utils.json_to_sheet(state.data.extractionQualityMaster||[]),'Extracción');XLSX.writeFile(workbook,`oleolab-calidad-y-lotes-${new Date().toISOString().slice(0,10)}.xlsx`);return toast('Maestro de Calidad generado.');}
     const source = {
-      warehouseRaw:(state.data.warehouseInventory||[]).filter(x=>['RAW_FRUIT','RAW_OTHER','BULK_OIL'].includes(x.type)),warehousePackaging:(state.data.warehouseInventory||[]).filter(x=>['PACKAGING','CONSUMABLE'].includes(x.type)),warehouseSpares:(state.data.warehouseInventory||[]).filter(x=>x.type==='SPARE_PART'),warehouseFinished:(state.data.warehouseInventory||[]).filter(x=>x.type==='FINISHED_GOOD'),
+      warehouseRaw:(state.data.warehouseInventory||[]).filter(x=>['RAW_FRUIT','RAW_OTHER','BULK_OIL'].includes(x.type)),warehousePackaging:(state.data.warehouseInventory||[]).filter(x=>x.type==='PACKAGING'),warehouseSpares:(state.data.warehouseInventory||[]).filter(x=>x.type==='SPARE_PART'),warehouseFinished:(state.data.warehouseInventory||[]).filter(x=>x.type==='FINISHED_GOOD'),
       movements:state.data.movements,forecast:state.data.forecast,mrp:state.data.mrp,filling:state.data.production,extraction:state.data.extractionQualityMaster,quality:state.data.lotMaster,shipping:state.data.shipments,returns:state.data.returns,warehouseAudits:state.data.inventoryAuditDetails,maintenance:state.data.maintenance,admin:state.data.users,audit:state.data.audit
     }[state.page];
     if (!source?.length) return toast('Esta vista no contiene registros exportables.', true);
@@ -1141,7 +1249,8 @@
   function dateFmt(value) { const date = new Date(`${value}T12:00:00`); return Number.isNaN(date.valueOf()) ? String(value ?? '') : new Intl.DateTimeFormat('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }).format(date); }
   function itemTypeLabel(value){return ({RAW_FRUIT:'Aguacate en fruta',RAW_OTHER:'Otra materia prima',PACKAGING:'Material de empaque',SPARE_PART:'Refacción',CONSUMABLE:'Consumible',BULK_OIL:'Aceite a granel',FINISHED_GOOD:'Producto terminado',SERVICE:'Servicio'})[value]||String(value??'');}
   function warehouseTypeLabel(value){return ({RAW_MATERIAL:'Materia prima',PACKAGING:'Materiales de empaque',SPARE_PARTS:'Refacciones',PROCESS:'Producto en proceso',FINISHED_GOODS:'Producto terminado',QUARANTINE:'Cuarentena',REJECTED:'Rechazados',RETURNS:'Devoluciones'})[value]||String(value??'');}
-  function unitLabel(value){return ({KG:'kilogramos',G:'gramos',L:'litros',ML:'mililitros',EA:'piezas',BOX:'cajas',BEAN:'contenedores de fruta',PALLET:'tarimas'})[value]||String(value??'');}
+  function unitLabel(value){return ({KG:'kilogramos',G:'gramos',L:'litros',ML:'mililitros',EA:'piezas',BOX:'cajas',BEAN:'contenedores de fruta',PALLET:'tarimas',ROLL:'rollos',BAG:'bolsas',DRUM:'tambores'})[value]||String(value??'');}
+  function presentationLabel(value,bins=0){return ({BINS:`${n(bins)} contenedores de fruta`,TANKER:'Pipa',IBC:'Contenedor intermedio',OTHER:'Otra presentación'})[value]||'Por asignar';}
   function qualityRequestTypeLabel(value){return ({INBOUND_FRUIT:'Materia prima · aguacate',INBOUND_MATERIAL:'Material recibido',IN_PROCESS:'Extracción y proceso',FINISHED_GOOD:'Producto terminado',CUSTOMER_RETURN:'Devolución de cliente',OTHER:'Otra inspección'})[value]||String(value??'');}
   function sampleTypeLabel(value){return ({PULP:'Pulpa',WET_PASTE:'Pasta húmeda',DRY_PASTE:'Pasta seca'})[value]||String(value??'');}
   function pct(value){return value==null||value===''?'—':`${n(value)}%`;}
@@ -1151,7 +1260,7 @@
   function countTypeLabel(value){return ({CYCLE:'Conteo cíclico',FULL:'Inventario total',SPOT:'Conteo selectivo',QUALITY_HOLD:'Pendiente de Calidad'})[value]||String(value??'');}
   function weekdayLabels(value){const labels={MON:'Lunes',TUE:'Martes',WED:'Miércoles',THU:'Jueves',FRI:'Viernes',SAT:'Sábado',SUN:'Domingo'};return String(value??'').split(',').map(code=>labels[code]||code).join(', ');}
   function movementTypeLabel(value){return ({RECEIPT:'Recepción',TRANSFER:'Transferencia',ISSUE_PRODUCTION:'Salida a producción',PRODUCTION_OUTPUT:'Entrada de producción',SHIPMENT:'Embarque',CUSTOMER_RETURN:'Devolución de cliente',SUPPLIER_RETURN:'Devolución a proveedor',QUALITY_RELEASE:'Liberación de Calidad',QUALITY_REJECT:'Rechazo de Calidad',COUNT_ADJUSTMENT:'Ajuste por auditoría',MAINTENANCE_ISSUE:'Salida a Mantenimiento',SCRAP:'Merma',REVERSAL:'Reversa',OTHER:'Inventario inicial'})[value]||String(value??'');}
-  function statusLabel(value){const key=String(value??'');return ({DRAFT:'Borrador',POSTED:'Contabilizado',CANCELLED:'Cancelado',PLANNED:'Planeado',SENT:'Enviado',CONFIRMED:'Confirmado',ARRIVED:'Llegó',IN_INSPECTION:'En inspección',COMPLETED:'Terminado',NO_SHOW:'No llegó',EXPECTED:'Esperado en WID',PARTIALLY_RECEIVED:'Recibido parcialmente',RECEIVED:'Recibido',WAITING_QUALITY:'Esperando Calidad',PARTIALLY_ACCEPTED:'Aceptación parcial',ACCEPTED:'Aceptado',REJECTED:'Rechazado',REQUESTED:'Solicitado',SAMPLING:'En análisis',TESTING:'En pruebas',APPROVED:'Aprobado',CONDITIONAL:'Aprobación condicional',OPEN:'Abierto',BLOCKED:'Bloqueado',ACTIVE:'Activo',DISABLED:'Desactivado',LOCKED:'Bloqueado',INVITED:'Invitado',ASSIGNED:'Asignado',RELEASED:'Liberado para producir',IN_PROGRESS:'En proceso',WAITING_PARTS:'Esperando materiales',VERIFIED:'Verificado y cerrado',CRITICAL:'Crítico',HIGH:'Alta',NORMAL:'Normal',LOW:'Baja',SHORTAGE:'Faltante',COVERED:'Cubierto',MATERIAL_CHECK:'Revisión de materiales',ON_HOLD:'En espera',FROZEN:'Congelado para conteo',COUNTING:'En conteo',RECOUNT:'Reconteo'})[key]||key;}
+  function statusLabel(value){const key=String(value??'');return ({DRAFT:'Borrador',POSTED:'Contabilizado',CANCELLED:'Cancelado',PLANNED:'Planeado',SENT:'Enviado',CONFIRMED:'Confirmado',LOADED:'Unidad cargada',IN_ROUTE:'En ruta',ARRIVED:'Llegó',IN_INSPECTION:'En inspección',COMPLETED:'Terminado',NO_SHOW:'No llegó',EXPECTED:'Esperado en WID',PARTIALLY_RECEIVED:'Recibido parcialmente',RECEIVED:'Recibido',WAITING_QUALITY:'Esperando Calidad',PARTIALLY_ACCEPTED:'Aceptación parcial',ACCEPTED:'Aceptado',REJECTED:'Rechazado',REQUESTED:'Solicitado',SAMPLING:'En análisis',TESTING:'En pruebas',APPROVED:'Aprobado',CONDITIONAL:'Aprobación condicional',OPEN:'Abierto',BLOCKED:'Bloqueado',ACTIVE:'Activo',DISABLED:'Desactivado',LOCKED:'Bloqueado',INVITED:'Invitado',ASSIGNED:'Asignado',RELEASED:'Liberado para producir',IN_PROGRESS:'En proceso',WAITING_PARTS:'Esperando materiales',VERIFIED:'Verificado y cerrado',CRITICAL:'Crítico',HIGH:'Alta',NORMAL:'Normal',LOW:'Baja',SHORTAGE:'Faltante',COVERED:'Cubierto',MATERIAL_CHECK:'Revisión de materiales',ON_HOLD:'En espera',FROZEN:'Congelado para conteo',COUNTING:'En conteo',RECOUNT:'Reconteo'})[key]||key;}
   function csvValue(value) { const text = String(value ?? ''); return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text; }
   function h(value) { return String(value ?? '').replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char])); }
 })();

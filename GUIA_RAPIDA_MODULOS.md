@@ -1,4 +1,4 @@
-# Guía sencilla de módulos · Oleolab Almacenes 0.4.0
+# Guía sencilla de módulos · Oleolab Almacenes 0.5.0
 
 ## Regla principal de acceso
 
@@ -34,7 +34,13 @@ Es el kardex de todas las entradas, salidas, consumos y ajustes autorizados. Un 
 
 ## Compras y WID
 
-Compras mantiene proveedores y orígenes y programa cada llegada con material, cantidad, almacén, fecha y hora. La cita genera un pre-lote y una partida WID, es decir, mercancía esperada. WID no suma existencia. Sólo Almacén convierte esa expectativa en recepción física.
+Compras mantiene proveedores y orígenes. **Recolección de materia prima** permite únicamente aguacate, aceite crudo, aceite refinado u otra materia prima autorizada; al guardar genera semana, fecha de solicitud, recolección, cita, prefolio y WID. **Entrega de empaque o refacción** usa únicamente esos catálogos y crea WID sin solicitar transporte de Logística. WID significa mercancía esperada y todavía no suma existencia.
+
+## Logística y conductor
+
+El coordinador registra unidades y asigna vehículo, conductor, presentación, contenedores y horario a las recolecciones de materia prima creadas por Compras. El conductor tiene una ventana distinta, ve sólo sus recolecciones y marca **Unidad cargada**, **Iniciar recorrido**, **Actualizar ubicación** y **Llegué a planta**. Al iniciar y llegar se avisa a los responsables de Almacén.
+
+El navegador pide permiso de ubicación únicamente al conductor. Si lo autoriza, la aplicación registra la ubicación más reciente, estima distancia y tiempo a planta y ofrece abrir la ruta. La ubicación no se obtiene en segundo plano cuando la página está cerrada.
 
 ## Calidad
 
@@ -48,11 +54,11 @@ El usuario selecciona el lote real de aguacate, la cantidad alimentada, el núme
 
 ## Envasado
 
-Crea y modifica listas de materiales por producto terminado. La versión 0.4.0 incorpora 195 listas autorizadas desde el archivo maestro; cada componente se elige de catálogo y lleva cantidad y merma esperada. Al crear una orden, la aplicación muestra inmediatamente lo necesario, disponible y faltante, y vuelve a validarlo al guardar. La lista queda fijada en la orden para evitar consumir materiales de otra presentación.
+Crea y modifica listas de materiales por producto terminado. La aplicación incorpora 195 listas autorizadas desde el archivo maestro; cada componente se elige de catálogo y lleva cantidad y merma esperada. Al crear una orden, la aplicación muestra inmediatamente lo necesario, disponible y faltante, y vuelve a validarlo al guardar. La lista queda fijada en la orden para evitar consumir materiales de otra presentación.
 
 ## Forecast y necesidades de materiales
 
-Forecast importa `.xlsx`, `.xls` o `.csv`, busca códigos de producto terminado y cantidades mensuales, conserva la primera versión como original y las siguientes como revisiones. El cálculo de necesidades explota las listas de materiales y muestra requerido, disponible, faltante y fecha; también puede ejecutarse manualmente con **Recalcular necesidades**. Un código que no existe en Producto terminado se reporta y no se importa silenciosamente.
+Forecast importa `.xlsx`, `.xls` o `.csv`, busca códigos de producto terminado y cantidades mensuales, conserva la primera versión como original y las siguientes como revisiones. También compara cada mes del Forecast único contra las órdenes reales de Envasado y lo ya terminado. El cálculo de necesidades explota las listas de materiales y muestra requerido, disponible, faltante y fecha; también puede ejecutarse manualmente con **Recalcular necesidades**. Un código que no existe en Producto terminado se reporta y no se importa silenciosamente.
 
 ## Mantenimiento
 
@@ -62,8 +68,8 @@ Cualquier usuario autorizado puede crear una solicitud con equipo, descripción,
 
 Embarques es consulta y reporte de salidas ya registradas. Rechazos y devoluciones conserva cliente, producto, lote, cantidad, referencia y motivo para seguimiento sin borrar el movimiento original.
 
-## Almacenes, zonas y sugerencias
+## Almacenes, ubicaciones y catálogos
 
-Los almacenes de materia prima, materiales de empaque, refacciones y producto terminado son configuración operativa oficial. **Existencia disponible** contiene material liberado; **Recepción temporal** contiene mercancía recién llegada; **Pendiente de liberación por Calidad** mantiene producto bloqueado; y **Producto rechazado** nunca forma parte de la existencia utilizable.
+Los almacenes y sus ubicaciones técnicas ya están configurados y no se crean durante la captura diaria. **Existencia disponible** contiene material liberado; **Recepción temporal** contiene mercancía recién llegada; **Pendiente de liberación por Calidad** mantiene producto bloqueado; y **Producto rechazado** nunca forma parte de la existencia utilizable. La aplicación filtra y propone la ubicación correcta para conservar trazabilidad sin pedir datos técnicos innecesarios.
 
-Los nombres de botellas, tapas, sellos, etiquetas y cajas aparecen como sugerencias al crear un material, pero no son registros ni generan existencia hasta que el usuario proporciona su código y guarda el alta.
+El catálogo oficial de materiales de empaque se usa directamente para **Capturar existencias actuales**. Los nombres de botellas, tapas, sellos, etiquetas y cajas sólo aparecen como sugerencias al dar de alta un artículo que realmente no existe. Materia prima, empaque, refacciones y producto terminado nunca se mezclan; esta regla se valida tanto en pantalla como en el servidor.

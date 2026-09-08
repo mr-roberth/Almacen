@@ -18,6 +18,7 @@ Navegador -> frontend estático -> API PHP 8.3 -> MySQL 8 en localhost
 - `database/migration_v1_4.sql`: módulos separados, WID, Calidad analítica, Envasado y Extracción trazable.
 - `database/migration_v1_5.sql`: almacenes base oficiales, zonas claras y ejemplos únicamente como sugerencias.
 - `database/migration_v1_6.sql`: catálogo PT/CME, listas de materiales y edición de usuarios con teléfono.
+- `database/migration_v1_7.sql`: recolecciones simplificadas, Logística, conductores, ubicación y ruta.
 - `assets/xlsx.full.min.js`: lector local de Excel utilizado por el importador de Forecast.
 - `private-tools/create_admin.php`: creación por consola del único superadministrador.
 - `INSTALACION.md`: publicación paso a paso en cPanel.
@@ -31,7 +32,7 @@ Navegador -> frontend estático -> API PHP 8.3 -> MySQL 8 en localhost
 - Consultas preparadas, política CSP, restricción de origen y carpetas sin listado.
 - Movimientos contabilizados inmutables; las correcciones se realizan con reversas.
 
-## Funciones de la versión 0.4.0
+## Funciones de la versión 0.5.0
 
 - Paneles diferenciados de Almacenes, Compras, Calidad y Mantenimiento.
 - Administración exclusiva del único superadministrador, roles personalizados y módulos seleccionados con casillas.
@@ -50,8 +51,13 @@ Navegador -> frontend estático -> API PHP 8.3 -> MySQL 8 en localhost
 - Importación oficial de 195 productos terminados, 432 materiales de empaque y 1,325 relaciones de consumo.
 - Vista previa de materiales necesarios, disponibles y faltantes antes de crear una orden de producción.
 - Edición de usuarios, teléfono, estado, contraseña y módulos desde la Administración protegida.
+- Recolección de materia prima con cita, prefolio y WID automáticos; cantidad admite decimales sin el error anterior del navegador.
+- Entregas independientes para materiales de empaque y refacciones, siempre contra su catálogo y almacén correspondiente.
+- Coordinación de Logística para asignar unidad, conductor, contenedores y horario; vista separada para cada conductor.
+- Avance de recorrido con ubicación autorizada por el conductor, cálculo estimado de ruta y avisos a Almacén.
+- Comparación mensual del Forecast único contra órdenes reales y cantidades terminadas.
 
-La instalación, actualización y operación se explican en `INSTALACION.md`, `ACTUALIZACION_V0.4.md` y `GUIA_RAPIDA_MODULOS.md`.
+La instalación, actualización y operación se explican en `INSTALACION.md`, `ACTUALIZACION_V0.5.md` y `GUIA_RAPIDA_MODULOS.md`.
 
 ## Repositorios
 
