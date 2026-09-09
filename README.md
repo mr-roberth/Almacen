@@ -19,6 +19,7 @@ Navegador -> frontend estático -> API PHP 8.3 -> MySQL 8 en localhost
 - `database/migration_v1_5.sql`: almacenes base oficiales, zonas claras y ejemplos únicamente como sugerencias.
 - `database/migration_v1_6.sql`: catálogo PT/CME, listas de materiales y edición de usuarios con teléfono.
 - `database/migration_v1_7.sql`: recolecciones simplificadas, Logística, conductores, ubicación y ruta.
+- `database/migration_v1_8.sql`: catálogos depurados, formulaciones, Forecast semanal y control del inventario inicial.
 - `assets/xlsx.full.min.js`: lector local de Excel utilizado por el importador de Forecast.
 - `private-tools/create_admin.php`: creación por consola del único superadministrador.
 - `INSTALACION.md`: publicación paso a paso en cPanel.
@@ -32,32 +33,24 @@ Navegador -> frontend estático -> API PHP 8.3 -> MySQL 8 en localhost
 - Consultas preparadas, política CSP, restricción de origen y carpetas sin listado.
 - Movimientos contabilizados inmutables; las correcciones se realizan con reversas.
 
-## Funciones de la versión 0.5.0
+## Funciones de la versión 0.8.0
 
-- Paneles diferenciados de Almacenes, Compras, Calidad y Mantenimiento.
-- Administración exclusiva del único superadministrador, roles personalizados y módulos seleccionados con casillas.
-- Altas separadas de materias primas y aceites, materiales de empaque, refacciones y producto terminado.
-- Levantamiento de inventario inicial sin cita de proveedor y auditoría física con ajuste trazable.
-- Calendario semanal de auditorías, indicador de confiabilidad y reporte Excel de diferencias con observaciones.
-- Importación de Forecast desde Excel, historial original contra revisiones y validación exacta de códigos.
-- Listas de materiales y cálculo automático de necesidades contra existencias y reservas.
-- Reporte analítico de inventario y reporte ejecutivo en Excel.
-- Solicitudes de Mantenimiento, varios técnicos, horas, bitácora, fotografías y avisos por correo.
-- Almacenes base listos para operar y sugerencias de nombres que no crean registros ficticios.
-- WID sin afectación física, pre-lote desde la cita y recepción con solicitud automática de Calidad.
-- Dictámenes parciales, resultados analíticos de aguacate y extracción, y maestro de lotes exportable.
-- Órdenes de Envasado, consumo automático por lista de materiales, merma y entrada trazable a producto terminado.
-- Extracción con lote de aguacate de origen, meta de contenedores por hora y genealogía del lote resultante.
-- Importación oficial de 195 productos terminados, 432 materiales de empaque y 1,325 relaciones de consumo.
-- Vista previa de materiales necesarios, disponibles y faltantes antes de crear una orden de producción.
-- Edición de usuarios, teléfono, estado, contraseña y módulos desde la Administración protegida.
-- Recolección de materia prima con cita, prefolio y WID automáticos; cantidad admite decimales sin el error anterior del navegador.
-- Entregas independientes para materiales de empaque y refacciones, siempre contra su catálogo y almacén correspondiente.
-- Coordinación de Logística para asignar unidad, conductor, contenedores y horario; vista separada para cada conductor.
-- Avance de recorrido con ubicación autorizada por el conductor, cálculo estimado de ruta y avisos a Almacén.
-- Comparación mensual del Forecast único contra órdenes reales y cantidades terminadas.
+- Interfaz central simplificada en tres almacenes: Materias primas y aceites, Materiales de empaque y Producto terminado.
+- Administración exclusiva del único superadministrador, con usuarios, roles, áreas y módulos seleccionados mediante casillas.
+- Catálogo oficial depurado de 135 productos terminados, 432 materiales de empaque y 992 relaciones de empaque.
+- Doce formulaciones de aceite versionadas; su consumo en litros se calcula según la presentación en mililitros de cada producto.
+- Inventario inicial sin cita, cierre por almacén, auditoría física y reporte de diferencias con trazabilidad.
+- Entrada y salida guiadas por catálogo: almacén, unidad y WID se resuelven automáticamente; las salidas no permiten consumir más de lo disponible.
+- WID separado de la existencia disponible y rechazado, con solicitud automática y dictamen parcial de Calidad.
+- Órdenes de producción ligadas a la versión vigente de empaque y formulación, sin modificar órdenes anteriores.
+- Forecast único versionado, comparación contra órdenes reales y distribución semanal que conserva el total mensual.
+- Proyección acumulada: existencia disponible + llegadas planeadas − consumo del Forecast.
+- Registro de 52 observaciones del origen sin inventar datos; 28 claves no oficiales del Forecast quedaron excluidas.
+- Datos y API aislados por permisos: cada usuario recibe solamente los almacenes y módulos que tiene autorizados.
 
-La instalación, actualización y operación se explican en `INSTALACION.md`, `ACTUALIZACION_V0.5.md` y `GUIA_RAPIDA_MODULOS.md`.
+Las tablas y flujos históricos de versiones anteriores se conservan para no perder información, pero la navegación 0.8 muestra únicamente el núcleo operativo descrito arriba.
+
+La actualización y la operación se explican en `ACTUALIZACION_V0.8.md` y `GUIA_RAPIDA_MODULOS_V0.8.md`.
 
 ## Repositorios
 

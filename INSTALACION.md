@@ -1,6 +1,6 @@
 # Instalación inicial en CI4KASH / cPanel
 
-Si la versión anterior ya funciona en `https://ci4kash.com/Apps/Almacen/`, siga `ACTUALIZACION_V0.5.md`; no repita la instalación inicial.
+Si la versión anterior ya funciona en `https://ci4kash.com/Apps/Almacen/`, siga `ACTUALIZACION_V0.8.md`; no repita la instalación inicial.
 
 ## 1. Preparar el sitio
 
@@ -57,7 +57,7 @@ Escriba una contraseña final y segura de al menos 12 caracteres cuando se solic
 ## 7. Validar antes del uso diario
 
 1. Entre con el administrador y confirme que aparecen todos los módulos.
-2. Importe también, en este orden, `database/migration_v1_3.sql`, `database/migration_v1_4.sql`, `database/migration_v1_5.sql`, `database/migration_v1_6.sql` y `database/migration_v1_7.sql`.
+2. Importe también, en este orden, `database/migration_v1_3.sql`, `database/migration_v1_4.sql`, `database/migration_v1_5.sql`, `database/migration_v1_6.sql`, `database/migration_v1_7.sql` y `database/migration_v1_8.sql`.
 3. Cargue unidades, almacenes, ubicaciones, proveedores/orígenes, clientes, productos, materiales y listas de materiales.
 4. Registre el inventario inicial y un flujo de prueba completo: cita, recepción, pre-lote, solicitud de Calidad y movimiento.
 5. Importe un Forecast de prueba y confirme que se generen las necesidades.

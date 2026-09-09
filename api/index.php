@@ -5,6 +5,7 @@ require __DIR__ . '/bootstrap.php';
 require __DIR__ . '/v13.php';
 require __DIR__ . '/v14.php';
 require __DIR__ . '/v15.php';
+require __DIR__ . '/v18.php';
 
 try {
     $config = loadAppConfig();
@@ -185,12 +186,15 @@ function buildBootstrap(PDO $pdo, array $user): array
     $result['lookups']=array_merge($result['lookups'],buildV14Lookups($pdo,$user,$isAdmin));
     $result=array_merge($result,buildV15Bootstrap($pdo,$user,$isAdmin));
     $result['lookups']=array_merge($result['lookups'],buildV15Lookups($pdo,$user,$isAdmin));
+    $result=array_merge($result,buildV18Bootstrap($pdo,$user,$isAdmin));
+    $result['lookups']=array_merge($result['lookups'],buildV18Lookups($pdo,$user,$isAdmin));
     applyV14DataScope($pdo,$user,$isAdmin,$result);
     $dataPermissions=[
         'appointments'=>'APPOINTMENTS','receipts'=>'RECEIVING','quality'=>'QUALITY','inventory'=>'INVENTORY','movements'=>'INVENTORY',
         'forecast'=>'FORECAST','mrp'=>'MRP','production'=>'PRODUCTION','shipments'=>'SHIPPING','returns'=>'RETURNS','counts'=>'COUNTS','auditSchedules'=>'COUNTS','inventoryAuditDetails'=>'COUNTS',
         'initialInventory'=>'INITIAL_INVENTORY','maintenance'=>'MAINTENANCE','maintenanceUpdates'=>'MAINTENANCE','maintenanceEvidence'=>'MAINTENANCE',
-        'purchaseDashboard'=>'PURCHASING','driverCollections'=>'DRIVER_COLLECTIONS','audit'=>'AUDIT_LOG'
+        'purchaseDashboard'=>'PURCHASING','driverCollections'=>'DRIVER_COLLECTIONS','audit'=>'AUDIT_LOG',
+        'weeklyForecast'=>'FORECAST','weeklyMaterialNeeds'=>'MRP','bomAssignments'=>'BOM_MANAGEMENT','oilFormulations'=>'BOM_MANAGEMENT','plannedArrivals'=>'PLANNED_ARRIVALS'
     ];
     $warehouseView=$isAdmin||hasAnyPermissionV14($pdo,(int)$user['id'],['WAREHOUSE_RAW','WAREHOUSE_PACKAGING','WAREHOUSE_SPARES','WAREHOUSE_FINISHED'],'VIEW');
     foreach($dataPermissions as $key=>$moduleCode)if(!$isAdmin&&!userHasPermission($pdo,(int)$user['id'],$moduleCode,'VIEW')){
@@ -203,7 +207,7 @@ function buildBootstrap(PDO $pdo, array $user): array
 
 function frontendModules(PDO $pdo, int $userId): array
 {
-    $map = ['DASHBOARD'=>'dashboard','PURCHASING'=>'purchasing','APPOINTMENTS'=>'purchasing','RECEIVING'=>'warehouseRaw','QUALITY'=>'quality','INVENTORY'=>'movements','INITIAL_INVENTORY'=>'warehouseAudits','COUNTS'=>'warehouseAudits','FORECAST'=>'forecast','MRP'=>'mrp','PRODUCTION'=>'filling','FILLING'=>'filling','EXTRACTION'=>'extraction','LOGISTICS'=>'logistics','DRIVER_COLLECTIONS'=>'driverCollections','SHIPPING'=>'shipping','RETURNS'=>'returns','MAINTENANCE'=>'maintenance','WAREHOUSE_RAW'=>'warehouseRaw','WAREHOUSE_PACKAGING'=>'warehousePackaging','WAREHOUSE_SPARES'=>'warehouseSpares','WAREHOUSE_FINISHED'=>'warehouseFinished','QUALITY_ANALYTICS'=>'quality'];
+    $map = ['DASHBOARD'=>'dashboard','PURCHASING'=>'purchasing','APPOINTMENTS'=>'purchasing','RECEIVING'=>'warehouseRaw','QUALITY'=>'quality','INVENTORY'=>'movements','INITIAL_INVENTORY'=>'warehouseAudits','COUNTS'=>'warehouseAudits','FORECAST'=>'forecast','MRP'=>'mrp','PRODUCTION'=>'filling','FILLING'=>'filling','BOM_MANAGEMENT'=>'bomManagement','PLANNED_ARRIVALS'=>'plannedArrivals','EXTRACTION'=>'extraction','LOGISTICS'=>'logistics','DRIVER_COLLECTIONS'=>'driverCollections','SHIPPING'=>'shipping','RETURNS'=>'returns','MAINTENANCE'=>'maintenance','WAREHOUSE_RAW'=>'warehouseRaw','WAREHOUSE_PACKAGING'=>'warehousePackaging','WAREHOUSE_SPARES'=>'warehouseSpares','WAREHOUSE_FINISHED'=>'warehouseFinished','QUALITY_ANALYTICS'=>'quality'];
     $rows = safeRows($pdo, "SELECT DISTINCT m.code FROM app_modules m INNER JOIN permissions p ON p.module_id=m.id AND p.action_code='VIEW' WHERE m.is_active=1 AND (EXISTS (SELECT 1 FROM user_roles ur INNER JOIN role_permissions rp ON rp.role_id=ur.role_id WHERE ur.user_id=:role_user AND ur.is_active=1 AND rp.permission_id=p.id) OR EXISTS (SELECT 1 FROM user_permission_overrides ua WHERE ua.user_id=:allow_user AND ua.permission_id=p.id AND ua.decision='ALLOW')) AND NOT EXISTS (SELECT 1 FROM user_permission_overrides ud WHERE ud.user_id=:deny_user AND ud.permission_id=p.id AND ud.decision='DENY')", ['role_user'=>$userId,'allow_user'=>$userId,'deny_user'=>$userId]);
     $modules = ['dashboard'];
     foreach ($rows as $row) {
@@ -330,15 +334,24 @@ function createOperation(PDO $pdo, array $user, array $payload, array $config): 
         'logisticsSiteV15' => saveLogisticsSiteV15($pdo, $user, $payload),
         'collectionAssignmentV15' => assignCollectionV15($pdo, $user, $payload, $config),
         'driverCollectionActionV15' => updateDriverCollectionV15($pdo, $user, $payload, $config),
-        'productionOrder' => createProductionOrderV14($pdo, $user, $payload),
-        'productionCompletion' => createProductionCompletionV14($pdo, $user, $payload),
+        'productionOrder' => tableExistsV18($pdo,'finished_product_bom_assignments')?createProductionOrderV18($pdo,$user,$payload):createProductionOrderV14($pdo, $user, $payload),
+        'productionCompletion' => tableExistsV18($pdo,'finished_product_bom_assignments')?createProductionCompletionV18($pdo,$user,$payload,$config):createProductionCompletionV14($pdo, $user, $payload),
         'extractionBatch' => createExtractionV14($pdo, $user, $payload),
         'qualityDecisionV14' => saveQualityDecisionV14($pdo, $user, $payload),
         'qualityCancel' => cancelQualityRequestV14($pdo, $user, $payload),
         'technicianV14' => registerTechnicianV14($pdo, $user, $payload),
+        'productFormulaV18' => assignProductFormulaV18($pdo,$user,$payload),
+        'packagingComponentV18' => changePackagingComponentV18($pdo,$user,$payload),
+        'plannedArrivalV18' => createPlannedArrivalV18($pdo,$user,$payload),
+        'initialInventorySettingV18' => setInitialInventoryV18($pdo,$user,$payload),
+        'warehouseMovementV18' => createWarehouseMovementV18($pdo,$user,$payload,$config),
         default => failRequest('Tipo de operación no soportado.', 422),
     };
-    if(in_array($type,['movement','receiptV14','qualityDecision','qualityDecisionV14','initialInventory','physicalCount','productionCompletion','extractionBatch'],true))$result['mrpRunsUpdated']=recalculateCurrentForecasts($pdo,(int)$user['id']);
+    if($type==='forecastImport'&&($result['imported']??false)&&tableExistsV18($pdo,'forecast_weekly_lines')){
+        $versionId=(int)safeScalar($pdo,"SELECT v.id FROM forecast_versions v INNER JOIN forecast_plans p ON p.id=v.forecast_plan_id WHERE p.plan_code=:plan AND v.version_no=:version LIMIT 1",['plan'=>$result['plan'],'version'=>$result['version']]);
+        if($versionId>0)$result['weeklyRows']=rebuildWeeklyForecastV18($pdo,$versionId);
+    }
+    if(in_array($type,['movement','warehouseMovementV18','receiptV14','qualityDecision','qualityDecisionV14','initialInventory','physicalCount','productionCompletion','extractionBatch'],true))$result['mrpRunsUpdated']=recalculateCurrentForecasts($pdo,(int)$user['id']);
     return $result;
 }
 
